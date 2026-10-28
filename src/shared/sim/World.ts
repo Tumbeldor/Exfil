@@ -342,9 +342,7 @@ export class World {
     if (!this.canFire(a)) return;
     const w = activeWeapon(a.inv, a.active);
     if (!w) return;
-    const wd = weaponDef(w.id);
-    const interval = 60 / wd.rpm;
-    if (a.ws.cooldown > interval * 0.35) return;
+    if ((a.ws.credit ?? 1) < 0.85) return;
     if ((w.mag ?? 0) <= 0) {
       this.emit({ e: 'dry', id: a.id, to: a.id });
       return;
@@ -353,7 +351,7 @@ export class World {
     const valid = angles.filter((x) => Number.isFinite(x) && Math.abs(((x - a.aim + Math.PI * 3) % (Math.PI * 2)) - Math.PI) < 0.6);
     if (!valid.length) return;
     this.fireWeapon(a, w, valid.slice(0, ammo.pellets));
-    a.ws.cooldown += interval * 0.9;
+    a.ws.credit = (a.ws.credit ?? 1) - 1;
     if (a.stats) a.stats.shots++;
   }
 
@@ -1240,7 +1238,12 @@ export class World {
     ws.cooldown = Math.max(0, ws.cooldown - dt);
     if (ws.equipT > 0) ws.equipT = Math.max(0, ws.equipT - dt);
     const w = activeWeapon(a.inv, a.active);
-    if (w) ws.bloom = Math.max(0, ws.bloom - weaponDef(w.id).recover * dt);
+    if (w) {
+      const wd = weaponDef(w.id);
+      ws.bloom = Math.max(0, ws.bloom - wd.recover * dt);
+      // Feuerrate der Spieler als Guthaben: erlaubt kurze Bündel, begrenzt aber die Dauerrate
+      if (a.kind === 'player') ws.credit = Math.min(2.2, (ws.credit ?? 1) + (dt * wd.rpm) / 60);
+    }
     if (ws.reloadT > 0) {
       ws.reloadT -= dt;
       if (ws.reloadT <= 0) {

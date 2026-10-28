@@ -12,6 +12,8 @@ export interface WeaponState {
   bloom: number;
   equipT: number;
   reloadAmmo?: string;
+  /** Schuss-Guthaben für Spieler (toleriert gebündelte Netzwerkpakete) */
+  credit?: number;
 }
 
 export type ActionType = 'heal' | 'revive' | 'search' | 'unlock' | 'radio' | 'selfrevive';

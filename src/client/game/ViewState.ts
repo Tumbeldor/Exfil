@@ -78,7 +78,8 @@ export class ViewState {
     this.timeLeft = s.tl;
     if (s.ex) this.extracts = s.ex;
     const est = s.t - now;
-    if (this.offset === null || est > this.offset) this.offset = est;
+    // Maximum-Filter gegen Jitter; großer Rücksprung (Pause, Hänger) wird sofort übernommen
+    if (this.offset === null || est > this.offset || est < this.offset - 0.3) this.offset = est;
     else this.offset += (est - this.offset) * 0.03;
     this.lastSnapAt = now;
     this.latestT = s.t;

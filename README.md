@@ -15,6 +15,8 @@ Rüste dich im Versteck aus, betritt eine Zone voller Bots, plündere Behälter 
 - **Bots** mit Sichtkegel, Gehör, Reaktionszeit, Deckungssuche, Granaten und Squads: *Plünderer*, *Söldner*, *Wachen* und **Bosse** (*Der Kommandant*, *Kapitän Volkov*). Gegnerwellen im Raid.
 - **Sichtlinie / Fog of War**: Du siehst Gegner nur in deinem Sichtfeld; Wände blockieren die Sicht, Büsche verbergen. Schritte und Schüsse sind räumlich hörbar.
 - **Lager (Vault)** mit Kapazität, Ausrüstungs- und Taschenverwaltung, sicherer Behälter.
+- **Plünderer-Einsatz** (wie der Scav-Run): zufällige Gratis-Ausrüstung, Plünderer-Bots bleiben neutral, solange du nicht auf sie schießt – kein Risiko, Beute geht ins Lager (Abklingzeit 10 Min.).
+- **Versicherung**: Waffen und Schutzausrüstung gegen Gebühr versichern – nach dem Tod kommen sie (entladen) ins Lager zurück.
 - **Progression**: XP & Level (bis 40), **3 Händler** mit Loyalitätsstufen (Major Brandt, Dr. Weiss, Kowalski), **20 Aufträge** (Eliminieren, Erkunden, Extrahieren, Übergeben, Bosse), **Versteck-Ausbau** (Lagerraum, sicherer Behälter, Sanitätsraum, Händlernetz), Reparaturen, Statistiken.
 - **Coop**: Lobby mit 4-stelligem Code, gemeinsamer Spawn, Wiederbeleben am Boden liegender Teamkameraden, Markierungen (Ping), Teamanzeige, Reconnect bei Verbindungsabbruch. Jeder behält seine eigene Beute.
 - **Steuerung**: Tastatur & Maus, **Touch mit zwei virtuellen Sticks** (iPhone), Gamepad.

@@ -442,7 +442,7 @@ export function hideoutScreen(app: App, initial: HideoutTab): HTMLElement {
           'div',
           { class: 'title-row' },
           h('div', null, h('div', { style: { fontWeight: '800' } }, q.title), h('div', { class: 'tiny', style: { color: giver.color } }, giver.name)),
-          h('span', { class: 'll' }, st === 'claimed' ? '✓ erledigt' : st === 'complete' ? 'ABGESCHLOSSEN' : st === 'locked' ? `ab Level ${q.level}` : 'aktiv'),
+          h('span', { class: 'll' }, st === 'claimed' ? '✓ erledigt' : st === 'complete' ? 'ABGESCHLOSSEN' : st === 'locked' ? (profileLevel(pr) < q.level ? `ab Level ${q.level}` : 'gesperrt') : 'aktiv'),
         ),
       );
       card.appendChild(h('div', { class: 'small muted', style: { margin: '6px 0' } }, q.desc));
