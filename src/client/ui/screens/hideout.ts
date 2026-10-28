@@ -30,6 +30,9 @@ import {
   stashAll,
   unloadWeapon,
   vaultCap,
+  INSURABLE,
+  insuranceCost,
+  insureItem,
 } from '../../../shared/profile';
 import { LL_LEVELS, TRADERS, type TraderId, UPGRADES, levelProgress } from '../../../shared/progression';
 import { QUESTS, objectiveTarget, questDef } from '../../../shared/quests';
@@ -160,6 +163,7 @@ export function hideoutScreen(app: App, initial: HideoutTab): HTMLElement {
       if (it.mag) actions.push(act('Entladen', () => unloadWeapon(p(), uid)));
     }
     if (isArmor(d) && repairCost(it) > 0) actions.push(act(`Reparieren (${formatMoney(repairCost(it))})`, () => repairItem(p(), uid)));
+    if (INSURABLE.has(d.cat) && !it.ins) actions.push(act(`Versichern (${formatMoney(insuranceCost(it))})`, () => insureItem(p(), uid)));
     if (d.cat !== 'cash') {
       const price = sellPrice({ ...it, n: qty() ?? it.n }, sellBonus(p()));
       actions.push(
@@ -188,7 +192,7 @@ export function hideoutScreen(app: App, initial: HideoutTab): HTMLElement {
       itemHeader(it),
       itemStats(it),
       qtyInput ? h('div', { class: 'row gap-s', style: { marginBottom: '8px' } }, h('span', { class: 'small muted' }, 'Menge:'), qtyInput, h('span', { class: 'small muted' }, `von ${it.n}`)) : null,
-      h('div', { class: 'small muted', style: { marginBottom: '6px' } }, `Ort: ${whereName(where)}`),
+      h('div', { class: 'small muted', style: { marginBottom: '6px' } }, `Ort: ${whereName(where)}${it.ins ? ' · versichert' : ''}`),
       h('div', { class: 'actions' }, actions),
     );
     close = modal(content);

@@ -30,6 +30,8 @@ export function resultsScreen(app: App, rep: RaidReport, r: RaidResult, coop: bo
     { class: 'screen results' },
     h('div', { class: 'result-banner ' + r.status }, title),
     h('div', { class: 'muted center', style: { marginBottom: '12px' } }, `${mapMeta(r.mapId).name} · ${formatTime(r.time)} · ${sub}`),
+    rep.scav ? h('div', { class: 'small muted', style: { marginBottom: '8px' } }, r.status === 'extracted' ? 'Plünderer-Einsatz: Die Beute wurde in dein Lager gelegt.' : 'Plünderer-Einsatz: Deine eigene Ausrüstung war nicht in Gefahr.') : null,
+    rep.insured ? h('div', { class: 'panel center small', style: { padding: '8px 14px', marginBottom: '8px', borderColor: 'var(--blue)' } }, `Versicherung: ${rep.insured} Gegenstand/Gegenstände ins Lager zurückgegeben.`) : null,
     rep.levelAfter > rep.levelBefore ? h('div', { class: 'panel center', style: { padding: '10px 18px', marginBottom: '10px', borderColor: 'var(--accent)' } }, h('b', { class: 'accent' }, `LEVEL ${rep.levelAfter} ERREICHT!`), h('div', { class: 'tiny muted' }, 'Neue Händlerangebote und Aufträge könnten verfügbar sein.')) : null,
     h(
       'div',
@@ -75,7 +77,7 @@ export function resultsScreen(app: App, rep: RaidReport, r: RaidResult, coop: bo
       ? h(
           'div',
           { class: 'panel col gap-s', style: { padding: '14px', marginTop: '10px', width: 'min(900px,100%)' } },
-          h('h2', null, r.status === 'extracted' ? 'Mitgebracht' : 'Gerettet (sicherer Behälter)'),
+          h('h2', null, r.status === 'extracted' ? (rep.scav ? 'Ins Lager gelegt' : 'Mitgebracht') : 'Gerettet (sicherer Behälter)'),
           h('div', { class: 'item-grid' }, items.map((it) => itemTile(it))),
         )
       : null,

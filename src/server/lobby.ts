@@ -40,6 +40,7 @@ function sanitizeItem(it: ItemStack | undefined): ItemStack | undefined {
   if (typeof it.dur === 'number' && Number.isFinite(it.dur)) out.dur = Math.max(0, it.dur);
   if (typeof it.ammo === 'string' && hasItemDef(it.ammo)) out.ammo = it.ammo;
   if (typeof it.mag === 'number' && Number.isFinite(it.mag)) out.mag = Math.max(0, Math.min(200, Math.floor(it.mag)));
+  if (it.ins === true) out.ins = true;
   return out;
 }
 

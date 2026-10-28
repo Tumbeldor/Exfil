@@ -4,7 +4,7 @@ import { countItem, starterInventory } from '../src/shared/inventory';
 import { createItem } from '../src/shared/items';
 import type { HostMsg } from '../src/shared/net/protocol';
 import { RaidHost } from '../src/shared/net/RaidHost';
-import { applyRaidResult, beginRaid, buyOffer, claimQuest, newProfile, questStatus, sellItem } from '../src/shared/profile';
+import { applyRaidResult, beginRaid, buyOffer, claimQuest, insureItem, newProfile, questStatus, sellItem } from '../src/shared/profile';
 import { QUESTS } from '../src/shared/quests';
 import { OFFERS } from '../src/shared/trader';
 import type { Actor } from '../src/shared/sim/types';
@@ -190,6 +190,70 @@ describe('Coop', () => {
     run(w, 4.5);
     expect(p.downed).toBe(false);
     expect(countItem(p.inv, 'selfrevive')).toBe(0);
+  });
+});
+
+describe('Plünderer-Einsatz', () => {
+  it('Plünderer-Bots sind neutral, bis man auf sie schießt', () => {
+    const w = new World({ mapId: 'grenzstadt', seed: 21, difficulty: 1, players: 1, friendlyFire: false });
+    for (const a of [...w.actors.values()]) if (a.kind === 'bot') w.actors.delete(a.id);
+    const p = w.addPlayer({ name: 'S', inv: starterInventory(0), level: 1, color: '#fff', regen: 0, scav: true });
+    p.x = 40 * TILE;
+    p.y = 57.5 * TILE;
+    const bot = w.spawnBot('scav', p.x + 200, p.y, 7, null);
+    bot.aim = Math.PI;
+    const pmc = w.spawnBot('pmc', p.x - 2000, p.y, 8, null);
+    expect(w.hostile(bot, p)).toBe(false);
+    expect(w.hostile(pmc, p)).toBe(true);
+    let shots = 0;
+    run(w, 5, () => {
+      w.applyInput(p.id, { x: p.x, y: p.y, aim: 0, sprint: false, ads: false, moving: false });
+      shots += w.events.filter((e) => e.e === 'shot' && e.id === bot.id).length;
+    });
+    expect(bot.brain!.state).not.toBe('combat');
+    expect(p.hp).toBe(100);
+    w.damage(bot, 10, p, 'mp133', false);
+    expect(p.scavAngry).toBe(true);
+    expect(w.hostile(bot, p)).toBe(true);
+    expect(bot.brain!.state).toBe('combat');
+  });
+
+  it('Beute eines Plünderer-Einsatzes landet im Lager, eigene Ausrüstung bleibt', () => {
+    const p = newProfile('S');
+    const before = p.char.equip.primary!.uid;
+    const kit = beginRaid(p, 'grenzstadt', false, true);
+    expect(kit.equip.primary || kit.equip.secondary).toBeTruthy();
+    expect(p.scavReadyAt).toBeGreaterThan(Date.now());
+    kit.bag.push(createItem('goldbar'));
+    const vaultBefore = p.vault.length;
+    const rep = applyRaidResult(p, {
+      status: 'extracted', mapId: 'grenzstadt', extractId: 'west', inventory: kit, scav: true,
+      stats: { kills: { scav: 0, pmc: 0, guard: 0, boss: 0 }, killLog: [], searched: {}, bodies: 0, visited: [], damage: 0, shots: 0, hits: 0, heliCalls: 0, revives: 0, startValue: 0 },
+      time: 100, xp: { kills: 0, search: 0, extract: 600, survival: 40, total: 640 }, endValue: 90000,
+    });
+    expect(rep.scav).toBe(true);
+    expect(p.char.equip.primary!.uid).toBe(before);
+    expect(p.vault.length).toBeGreaterThan(vaultBefore);
+    expect(p.vault.some((x) => x.id === 'goldbar')).toBe(true);
+  });
+});
+
+describe('Versicherung', () => {
+  it('versicherte Ausrüstung kehrt nach dem Tod ins Lager zurück', () => {
+    const p = newProfile('V');
+    p.char.equip.armor = createItem('vest_light');
+    expect(insureItem(p, p.char.equip.armor.uid).ok).toBe(true);
+    const kit = beginRaid(p, 'grenzstadt', false);
+    const rep = applyRaidResult(p, {
+      status: 'killed', mapId: 'grenzstadt', inventory: { equip: {}, bag: [], secure: [], secureCap: 2 },
+      stats: { kills: { scav: 0, pmc: 0, guard: 0, boss: 0 }, killLog: [], searched: {}, bodies: 0, visited: [], damage: 0, shots: 0, hits: 0, heliCalls: 0, revives: 0, startValue: 30000 },
+      time: 100, xp: { kills: 0, search: 0, extract: 0, survival: 0, total: 0 }, endValue: 0,
+    });
+    expect(kit.equip.armor?.ins).toBe(true);
+    expect(rep.insured).toBe(1);
+    const back = p.vault.find((x) => x.id === 'vest_light')!;
+    expect(back.ins).toBe(false);
+    expect(p.char.equip.armor).toBeUndefined();
   });
 });
 

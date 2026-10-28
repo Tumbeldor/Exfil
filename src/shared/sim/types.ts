@@ -138,6 +138,10 @@ export interface Actor {
   /** letzte vom Client bestätigte Position (Validierung) */
   lastInputT: number;
   connected: boolean;
+  /** Plünderer-Einsatz: Plünderer-Bots sind neutral */
+  scav: boolean;
+  /** Plünderer wurden angegriffen und sind feindlich */
+  scavAngry: boolean;
 }
 
 export interface Bullet {
@@ -336,4 +340,5 @@ export interface RaidResult {
   time: number;
   xp: XpBreakdown;
   endValue: number;
+  scav?: boolean;
 }

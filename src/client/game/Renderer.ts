@@ -140,9 +140,9 @@ export class Renderer {
     for (const ex of view.map.extracts) {
       if (ex.x < x0 - 200 || ex.x > x1 + 200 || ex.y < y0 - 200 || ex.y > y1 + 200) continue;
       const st = view.extractState(ex.id);
-      const open = st?.open && (ex.kind !== 'heli' || st.heli?.phase === 'landed');
+      const open = st?.open && ex.kind !== 'paid' && ex.kind !== 'key' && (ex.kind !== 'heli' || st.heli?.phase === 'landed');
       ctx.save();
-      ctx.strokeStyle = open ? 'rgba(120,230,120,0.7)' : 'rgba(230,180,80,0.45)';
+      ctx.strokeStyle = open ? 'rgba(120,230,120,0.7)' : st?.open ? 'rgba(232,208,112,0.55)' : 'rgba(224,122,96,0.45)';
       ctx.fillStyle = open ? 'rgba(80,200,80,0.08)' : 'rgba(200,150,60,0.05)';
       ctx.lineWidth = 3;
       ctx.setLineDash([14, 10]);
@@ -267,10 +267,10 @@ export class Renderer {
     for (const ex of view.map.extracts) {
       if (ex.x < x0 - 300 || ex.x > x1 + 300 || ex.y < y0 - 300 || ex.y > y1 + 300) continue;
       const st = view.extractState(ex.id);
-      const open = st?.open;
+      const conditional = ex.kind === 'paid' || ex.kind === 'key' || (ex.kind === 'heli' && st?.heli?.phase !== 'landed');
       ctx.font = `bold ${13 / z}px sans-serif`;
       ctx.textAlign = 'center';
-      ctx.fillStyle = open ? '#9af08a' : '#e0b060';
+      ctx.fillStyle = !st?.open ? '#e07a60' : conditional ? '#e8d070' : '#9af08a';
       ctx.fillText('⇱ ' + ex.name, ex.x, ex.y - ex.r - 6 / z);
     }
     const tnow = performance.now() / 1000;

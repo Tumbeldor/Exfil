@@ -28,7 +28,8 @@ import {
   stackValue,
   weaponDef,
 } from './items';
-import type { BotType } from './loot';
+import { type BotType, botLoadout } from './loot';
+import { Rng } from './rng';
 import { type UpgradeId, MAX_LEVEL, UPGRADES, levelForXp, loyaltyFor, upgradeDef, upgradeValue } from './progression';
 import { type QuestDef, QUESTS, objectiveGain, objectiveTarget } from './quests';
 import type { RaidResult } from './sim/types';
@@ -63,9 +64,14 @@ export interface Profile {
   upgrades: Record<UpgradeId, number>;
   quests: Record<string, QuestState>;
   stats: ProfileStats;
-  activeRaid: { mapId: string; started: number; coop: boolean; secure: ItemStack[]; token?: string } | null;
+  activeRaid: { mapId: string; started: number; coop: boolean; secure: ItemStack[]; insured?: ItemStack[]; scav?: boolean } | null;
   created: number;
+  /** Zeitpunkt, ab dem der nächste Plünderer-Einsatz möglich ist */
+  scavReadyAt: number;
 }
+
+export const SCAV_COOLDOWN_MS = 10 * 60 * 1000;
+export const INSURABLE = new Set(['weapon', 'armor', 'helmet', 'backpack']);
 
 export const PLAYER_COLORS = ['#7fb069', '#5aa9e6', '#e6b85a', '#e65a8a', '#a35ae6', '#5ae6c8'];
 
@@ -83,6 +89,7 @@ export function newProfile(name: string): Profile {
     stats: { raids: 0, extracts: 0, deaths: 0, mia: 0, kills: { scav: 0, pmc: 0, guard: 0, boss: 0 }, lootValue: 0, bestRaid: 0, playTime: 0, heliExtracts: 0, headshots: 0 },
     activeRaid: null,
     created: Date.now(),
+    scavReadyAt: 0,
   };
   refreshQuests(p);
   return p;
@@ -102,6 +109,7 @@ export function normalizeProfile(raw: unknown): Profile {
   for (const s of EQUIP_SLOTS) if (valid(ch.equip?.[s])) equip[s] = ch.equip![s];
   p.char = { equip, bag: (ch.bag ?? []).filter(valid), secure: (ch.secure ?? []).filter(valid), secureCap: secureCap(p) };
   if (!Number.isFinite(p.money)) p.money = 0;
+  if (!Number.isFinite(p.scavReadyAt)) p.scavReadyAt = 0;
   if (!Number.isFinite(p.xp)) p.xp = 0;
   refreshQuests(p);
   return p;
@@ -182,21 +190,76 @@ export function handover(p: Profile, id: string, objIndex: number): { ok: boolea
 // ------------------------------------------------------------------
 // Raids
 // ------------------------------------------------------------------
-export function beginRaid(p: Profile, mapId: string, coop: boolean): Inventory {
+export function beginRaid(p: Profile, mapId: string, coop: boolean, scav = false): Inventory {
+  if (scav) {
+    p.activeRaid = { mapId, started: Date.now(), coop, secure: [], scav: true };
+    p.scavReadyAt = Date.now() + SCAV_COOLDOWN_MS;
+    return scavKit();
+  }
   p.char.secureCap = secureCap(p);
-  p.activeRaid = { mapId, started: Date.now(), coop, secure: p.char.secure.map((x) => ({ ...x })) };
+  const insured = [...Object.values(p.char.equip), ...p.char.bag].filter((x): x is ItemStack => !!x && !!x.ins).map((x) => ({ ...x }));
+  p.activeRaid = { mapId, started: Date.now(), coop, secure: p.char.secure.map((x) => ({ ...x })), insured };
   return cloneInventory(p.char);
+}
+
+/** Zufällige Gratis-Ausrüstung für einen Plünderer-Einsatz. */
+export function scavKit(seed = Math.floor(Math.random() * 2 ** 31)): Inventory {
+  const rng = new Rng(seed);
+  const inv = botLoadout('scav', rng);
+  inv.secureCap = 0;
+  if (!inv.equip.secondary && !inv.equip.primary) inv.equip.secondary = createItem('pm9');
+  // genug Reservemunition für alle Waffen
+  for (const s of ['primary', 'secondary'] as const) {
+    const w = inv.equip[s];
+    if (w) addUnchecked(inv.bag, createItem(w.ammo ?? ammoForCaliber(weaponDef(w.id).caliber)[0].id, weaponDef(w.id).mag * 2));
+  }
+  if (!inv.bag.some((x) => itemDef(x.id).cat === 'med')) addUnchecked(inv.bag, createItem('bandage', 1));
+  return inv;
+}
+
+export function scavReadyIn(p: Profile): number {
+  return Math.max(0, p.scavReadyAt - Date.now());
+}
+
+export function insuranceCost(it: ItemStack): number {
+  return Math.max(300, Math.round((stackValue(it) * 0.18) / 10) * 10);
+}
+
+export function insureItem(p: Profile, uid: string): { ok: boolean; text?: string } {
+  const loc = locate(p, uid);
+  if (!loc) return { ok: false };
+  if (!INSURABLE.has(itemDef(loc.item.id).cat)) return { ok: false, text: 'Nur Waffen und Schutzausrüstung sind versicherbar.' };
+  if (loc.item.ins) return { ok: false, text: 'Bereits versichert.' };
+  const cost = insuranceCost(loc.item);
+  if (p.money < cost) return { ok: false, text: 'Nicht genug Geld.' };
+  p.money -= cost;
+  loc.item.ins = true;
+  return { ok: true, text: `Versichert für ${cost.toLocaleString('de-DE')} €. Geht beim Tod nicht verloren (einmalig).` };
+}
+
+function returnInsured(p: Profile, items: ItemStack[] | undefined): number {
+  let n = 0;
+  for (const it of items ?? []) {
+    const back = { ...it, ins: false };
+    if (back.mag) back.mag = 0;
+    addUnchecked(p.vault, back);
+    n++;
+  }
+  return n;
 }
 
 /** Raid wurde abgebrochen (Seite neu geladen, Verbindung verloren): wie Tod, nur sicherer Behälter bleibt. */
 export function abandonRaid(p: Profile): boolean {
   if (!p.activeRaid) return false;
-  const inv = emptyInventory(secureCap(p));
-  inv.secure = p.activeRaid.secure;
-  p.char = inv;
+  const ar = p.activeRaid;
   p.stats.raids++;
   p.stats.mia++;
   p.activeRaid = null;
+  if (ar.scav) return true;
+  const inv = emptyInventory(secureCap(p));
+  inv.secure = ar.secure;
+  p.char = inv;
+  returnInsured(p, ar.insured);
   return true;
 }
 
@@ -210,6 +273,8 @@ export interface QuestProgressNote {
 
 export interface RaidReport {
   status: RaidResult['status'];
+  scav: boolean;
+  insured: number;
   xp: number;
   levelBefore: number;
   levelAfter: number;
@@ -233,8 +298,16 @@ export function applyRaidResult(p: Profile, r: RaidResult): RaidReport {
     });
   }
   inv.secureCap = secureCap(p);
-  const kitLost = r.status === 'extracted' ? 0 : r.stats.startValue;
-  p.char = inv;
+  const scav = !!r.scav || !!p.activeRaid?.scav;
+  const kitLost = r.status === 'extracted' || scav ? 0 : r.stats.startValue;
+  let insured = 0;
+  if (scav) {
+    // Plünderer-Beute wandert direkt ins Lager, die eigene Ausrüstung bleibt unberührt
+    if (r.status === 'extracted') for (const it of [...Object.values(inv.equip), ...inv.bag, ...inv.secure]) if (it) addUnchecked(p.vault, { ...it, ins: false });
+  } else {
+    p.char = inv;
+    if (r.status !== 'extracted') insured = returnInsured(p, p.activeRaid?.insured);
+  }
   p.money += cash;
   p.xp += r.xp.total;
   const s = p.stats;
@@ -272,6 +345,8 @@ export function applyRaidResult(p: Profile, r: RaidResult): RaidReport {
   refreshQuests(p);
   return {
     status: r.status,
+    scav,
+    insured,
     xp: r.xp.total,
     levelBefore,
     levelAfter: profileLevel(p),

@@ -139,6 +139,8 @@ export interface ItemStack {
   ammo?: string;
   /** Patronen im Magazin (Waffen) */
   mag?: number;
+  /** versichert: kehrt nach dem Tod zurück */
+  ins?: boolean;
 }
 
 const W = (d: Omit<WeaponDef, 'cat' | 'stack' | 'icon'> & { icon?: string }): WeaponDef => ({

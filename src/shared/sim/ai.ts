@@ -115,7 +115,7 @@ function perceive(world: World, a: Actor, interval: number) {
   let bestScore = Infinity;
   let bestD = 0;
   for (const p of world.actors.values()) {
-    if (p.team === a.team || !p.alive || p.extracted) continue;
+    if (!p.alive || p.extracted || !world.hostile(a, p)) continue;
     const d = dist(a.x, a.y, p.x, p.y);
     if (d > br.skill.view * 1.05) continue;
     // Gehör: sprintende Spieler in der Nähe
@@ -179,7 +179,7 @@ function alertSquad(world: World, a: Actor, target: Actor) {
 
 export function onBotDamaged(world: World, a: Actor, attacker: Actor) {
   const br = a.brain;
-  if (!br || attacker.team === a.team) return;
+  if (!br || !world.hostile(a, attacker)) return;
   br.awareness = 1;
   const err = world.rng.range(-70, 70);
   br.lastSeen = { x: attacker.x + err, y: attacker.y - err, t: world.t };

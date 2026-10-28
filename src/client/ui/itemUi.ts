@@ -47,6 +47,7 @@ export function itemTile(it: ItemStack, o: TileOpts = {}): HTMLElement {
   }
   if (isMed(d) && d.uses > 1) el.appendChild(h('div', { class: 'qty' }, `${it.dur ?? d.uses}/${d.uses}`));
   if (isBackpack(d)) el.appendChild(h('div', { class: 'tag' }, '+' + d.cap));
+  if (it.ins) el.appendChild(h('div', { class: 'ins', title: 'Versichert' }, '⛨'));
   if (o.priceTag) el.appendChild(h('div', { class: 'tag', style: { color: 'var(--accent2)' } }, o.priceTag));
   if (o.onClick) el.addEventListener('click', o.onClick);
   if (o.onContext)

@@ -118,11 +118,13 @@ export class RaidInventory {
     for (const it of inv.bag) bag.appendChild(this.ownTile(it));
     if (!inv.bag.length) bag.appendChild(h('div', { class: 'muted small' }, 'Leer'));
     this.left.appendChild(bag);
-    this.left.appendChild(capRow('Sicherer Behälter', slotsUsed(inv.secure), inv.secureCap));
-    const sec = h('div', { class: 'item-grid' });
-    for (const it of inv.secure) sec.appendChild(this.ownTile(it));
-    this.left.appendChild(sec);
-    if (!inv.secure.length) this.left.appendChild(h('div', { class: 'muted small' }, 'Leer – Inhalt bleibt beim Tod erhalten.'));
+    if (inv.secureCap > 0) {
+      this.left.appendChild(capRow('Sicherer Behälter', slotsUsed(inv.secure), inv.secureCap));
+      const sec = h('div', { class: 'item-grid' });
+      for (const it of inv.secure) sec.appendChild(this.ownTile(it));
+      this.left.appendChild(sec);
+      if (!inv.secure.length) this.left.appendChild(h('div', { class: 'muted small' }, 'Leer – Inhalt bleibt beim Tod erhalten.'));
+    }
 
     // ---- Behälter
     this.inner.classList.toggle('solo', !cv);
@@ -176,7 +178,7 @@ export class RaidInventory {
     if (isAmmo(d)) acts.push({ label: 'In aktive Waffe laden', run: () => this.send({ a: 'reload', ammo: it.id }) });
     if (!slot && slotForDef(d)) acts.push({ label: 'Ausrüsten', run: () => this.send({ a: 'equip', uid: it.uid }) });
     if (slot) acts.push({ label: 'In die Tasche', run: () => this.send({ a: 'unequip', slot }) });
-    if (!slot) acts.push({ label: inSecure ? 'In die Tasche' : 'In sicheren Behälter', run: () => this.send({ a: 'move', uid: it.uid, to: inSecure ? 'bag' : 'secure' }) });
+    if (!slot && (inSecure || (this.inv?.secureCap ?? 0) > 0)) acts.push({ label: inSecure ? 'In die Tasche' : 'In sicheren Behälter', run: () => this.send({ a: 'move', uid: it.uid, to: inSecure ? 'bag' : 'secure' }) });
     if (this.cview) acts.push({ label: `In ${this.cview.name} legen`, run: () => this.send({ a: 'put', c: this.cview!.id, uid: it.uid }) });
     if (d.stack > 1 && it.n > 1) acts.push({ label: 'Hälfte fallen lassen', run: () => this.send({ a: 'drop', uid: it.uid, n: Math.ceil(it.n / 2) }) });
     acts.push({ label: 'Fallen lassen', run: () => this.send({ a: 'drop', uid: it.uid }), cls: 'bad' });

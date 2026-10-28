@@ -119,15 +119,15 @@ export class App {
   }
 
   // ---- Raids ----
-  startSolo(mapId: string, difficulty: number) {
+  startSolo(mapId: string, difficulty: number, scav = false) {
     const p = this.profile;
-    const kit = beginRaid(p, mapId, false);
+    const kit = beginRaid(p, mapId, false, scav);
     this.save();
     const link = new LocalLink(
       { mapId, seed: (Math.random() * 2 ** 31) | 0, difficulty, players: 1, friendlyFire: false },
-      { name: p.name, inv: kit, level: profileLevel(p), color: p.color, regen: regenRate(p) },
+      { name: p.name, inv: kit, level: profileLevel(p), color: scav ? '#8a7a55' : p.color, regen: scav ? 0 : regenRate(p), scav },
     );
-    this.runSession(link, false);
+    this.runSession(link, false, scav);
   }
 
   /** Coop-Raid starten, sobald der Server raidStart schickt. */
@@ -141,7 +141,7 @@ export class App {
     this.runSession(link, true);
   }
 
-  private runSession(link: LocalLink | NetLink, coop: boolean) {
+  private runSession(link: LocalLink | NetLink, coop: boolean, scav = false) {
     this.clearScreen();
     clear(this.ui);
     this.session = new RaidSession({
@@ -151,7 +151,8 @@ export class App {
       touch: this.touch,
       link,
       name: this.profile.name,
-      color: this.profile.color,
+      color: scav ? '#8a7a55' : this.profile.color,
+      firstRaid: this.profile.stats.raids < 2,
       onFinish: (r) => {
         this.session = null;
         const report = applyRaidResult(this.profile, r);

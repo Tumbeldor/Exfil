@@ -85,6 +85,8 @@ export interface PlayerJoin {
   level: number;
   color: string;
   regen: number;
+  /** Plünderer-Einsatz */
+  scav?: boolean;
 }
 
 export const XP_KILL: Record<BotType | 'player', number> = { scav: 150, pmc: 400, guard: 450, boss: 2000, player: 0 };
@@ -201,8 +203,13 @@ export class World {
     return out;
   }
 
+  /** Feindschaft unter Berücksichtigung des Plünderer-Einsatzes. */
   hostile(a: Actor, b: Actor) {
-    return a.team !== b.team;
+    if (a.team === b.team) return false;
+    const p = a.kind === 'player' ? a : b;
+    const bot = a.kind === 'player' ? b : a;
+    if (p.scav && !p.scavAngry && bot.botType === 'scav') return false;
+    return true;
   }
 
   containerInfos(): ContainerInfo[] {
@@ -246,6 +253,8 @@ export class World {
       regen: 0,
       lastInputT: 0,
       connected: true,
+      scav: false,
+      scavAngry: false,
       ...p,
     };
     this.actors.set(a.id, a);
@@ -277,6 +286,7 @@ export class World {
       level: join.level,
       regen: join.regen,
       lastInputT: this.t,
+      scav: !!join.scav,
     });
     a.aim = Math.atan2(this.map.pixelH / 2 - y, this.map.pixelW / 2 - x);
     a.stats = emptyStats();
@@ -926,7 +936,7 @@ export class World {
       const d = dist(a.x, a.y, g.x, g.y);
       if (d > g.radius) continue;
       if (!this.map.clearLine(g.x, g.y, a.x, a.y, F_BULLET)) continue;
-      if (owner && a !== owner && !this.hostile(owner, a) && !this.cfg.friendlyFire) continue;
+      if (owner && a !== owner && owner.team === a.team && !this.cfg.friendlyFire) continue;
       const fall = 1 - d / g.radius;
       let dmg = g.dmg * (0.25 + 0.75 * fall * fall);
       const armor = a.inv.equip.armor;
@@ -953,6 +963,10 @@ export class World {
       return;
     }
     target.hp -= amount;
+    if (attacker && attacker.scav && !attacker.scavAngry && target.botType === 'scav') {
+      attacker.scavAngry = true;
+      this.msg(attacker.id, 'Du hast auf Plünderer geschossen – sie sind jetzt feindlich!', 'warn');
+    }
     if (target.action && target.action.type !== 'heal' && target.action.type !== 'selfrevive') target.action = null;
     if (target.kind === 'bot' && attacker) onBotDamaged(this, target, attacker);
     if (target.hp <= 0) {
@@ -1025,6 +1039,7 @@ export class World {
       time: this.t,
       xp,
       endValue: inventoryValue(inv),
+      scav: p.scav,
       ...extra,
     };
     this.results.set(p.id, res);

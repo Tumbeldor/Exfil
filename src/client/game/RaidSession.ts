@@ -27,6 +27,7 @@ export interface RaidSessionOpts {
   color: string;
   onFinish: (r: RaidResult) => void;
   onAbandon: () => void;
+  firstRaid?: boolean;
 }
 
 interface InteractTarget {
@@ -145,6 +146,7 @@ export class RaidSession {
             this.renderer!.cam.y = mine.y;
             audio.startAmbient();
             this.hud!.message(`${v.map.meta.name} – finde Beute und extrahiere! (O: Extraktionen)`, 'info', 6000);
+            if (this.opts.firstRaid) this.showControlsHint();
           }
         }
         const me = m.s.me;
@@ -758,6 +760,33 @@ export class RaidSession {
       }
     }
     if (!active) audio.setHeli(false);
+  }
+
+  private showControlsHint() {
+    const rows = this.opts.touch
+      ? [
+          ['Linker Daumen', 'Bewegen – über den Rand ziehen zum Sprinten'],
+          ['Rechter Daumen', 'Zielen – weit auslenken zum Schießen'],
+          ['Gelber Knopf', 'Durchsuchen, Plündern, Türen, Heli-Funk'],
+          ['Tasche / Karte', 'oben rechts · Timer antippen = Extraktionen'],
+        ]
+      : [
+          ['WASD · Shift', 'Bewegen · Sprinten'],
+          ['Maus · Rechtsklick', 'Zielen/Feuern · genau zielen'],
+          ['E · Tab', 'Durchsuchen/Interagieren · Inventar'],
+          ['R · H · G', 'Nachladen · Heilen · Granate'],
+          ['M · O', 'Karte · Extraktionen'],
+        ];
+    const box = h(
+      'div',
+      { class: 'panel', style: { position: 'absolute', left: '50%', top: '22%', transform: 'translateX(-50%)', padding: '12px 16px', pointerEvents: 'auto', maxWidth: '92vw', zIndex: '15' } },
+      h('h2', { style: { marginBottom: '6px' } }, 'Steuerung'),
+      h('div', { class: 'kv small' }, rows.flatMap(([k, v]) => [h('div', { class: 'accent' }, k), h('div', null, v)])),
+      h('div', { class: 'tiny muted', style: { marginTop: '6px' } }, 'Ziel: Beute finden und lebend eine Extraktion erreichen. Tippen zum Schließen.'),
+    );
+    box.addEventListener('pointerdown', () => box.remove());
+    this.root.appendChild(box);
+    setTimeout(() => box.remove(), 12000);
   }
 
   // ---- Debug-Hilfen für automatisierte Tests ----

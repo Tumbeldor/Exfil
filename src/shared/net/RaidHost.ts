@@ -5,7 +5,7 @@ import type { Actor, ActorSnap, GameEvent, MeSnap, Snapshot } from '../sim/types
 import { type PlayerJoin, World, type WorldConfig } from '../sim/World';
 import type { HostMsg, RaidClientMsg } from './protocol';
 
-const VIEW_R2 = 1800 * 1800;
+const VIEW_R2 = 1600 * 1600;
 const BULLET_R2 = 2000 * 2000;
 const DISCONNECT_GRACE = 90;
 
@@ -168,6 +168,7 @@ export class RaidHost {
   }
 
   stepOnce() {
+    if (this.ended) return;
     const w = this.world;
     w.step(TICK_DT);
     this.tick++;
@@ -262,9 +263,9 @@ export class RaidHost {
       const s: ActorSnap = {
         i: a.id,
         k: a.kind === 'player' ? 'p' : 'b',
-        x: Math.round(a.x * 10) / 10,
-        y: Math.round(a.y * 10) / 10,
-        a: Math.round(a.aim * 1000) / 1000,
+        x: a.kind === 'player' ? Math.round(a.x * 10) / 10 : Math.round(a.x),
+        y: a.kind === 'player' ? Math.round(a.y * 10) / 10 : Math.round(a.y),
+        a: Math.round(a.aim * 100) / 100,
         f,
         w: wpn?.id ?? '',
         h: a.inv.equip.helmet?.id ?? '',
