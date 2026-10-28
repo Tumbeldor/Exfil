@@ -9,7 +9,7 @@ import { LocalLink, NetLink } from '../net/links';
 import { NetClient } from '../net/NetClient';
 import { type Settings, isTouchDevice, saveSettings } from '../settings';
 import { saveProfile } from '../storage';
-import { clear, h, modal } from './dom';
+import { clear, h, modal, toast } from './dom';
 import { hideoutScreen, type HideoutTab } from './screens/hideout';
 import { lobbyScreen } from './screens/lobby';
 import { menuScreen } from './screens/menu';
@@ -80,6 +80,13 @@ export class App {
     this.show(menuScreen(this));
   }
   goHideout(tab: HideoutTab = 'gear') {
+    // Ausrüstung darf sich nach "Bereit" nicht mehr ändern – sonst passt das gemeldete Kit nicht
+    const net = this.net;
+    const me = net?.lobby?.players.find((p) => p.id === net.id);
+    if (net && me?.ready && !net.lobby?.raidActive) {
+      net.send({ type: 'ready', ready: false });
+      toast('Bereit-Status aufgehoben – nach Änderungen erneut „Bereit“ drücken.', 'info', 3500);
+    }
     this.show(hideoutScreen(this, tab));
   }
   goRaidPrep() {

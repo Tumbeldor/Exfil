@@ -183,10 +183,7 @@ export function lobbyScreen(app: App): HTMLElement {
               },
               me?.ready ? 'Nicht bereit' : 'Bereit',
             ),
-            h('button', { class: 'btn', onclick: () => {
-              if (me?.ready) net.send({ type: 'ready', ready: false });
-              app.goHideout();
-            } }, 'Ausrüstung ändern'),
+            h('button', { class: 'btn', onclick: () => app.goHideout() }, 'Ausrüstung ändern'),
             isHost ? h('button', { class: 'btn primary', disabled: !allReady || lobby.raidActive, onclick: () => net.send({ type: 'start' }) }, 'Raid starten ▶') : null,
             h('button', { class: 'btn danger small', onclick: () => {
               net.send({ type: 'leave' });

@@ -48,7 +48,7 @@ import {
 } from '../items';
 import { type BotType, botLoadout, rollContainer, rollLooseLoot } from '../loot';
 import { clamp, dist, dist2, segmentCircle } from '../math';
-import { CONTAINER_NAMES, F_BULLET, F_MOVE, type GameMap } from '../map/GameMap';
+import { CONTAINER_NAMES, F_BULLET, F_MOVE, F_SIGHT, type GameMap } from '../map/GameMap';
 import { buildMap } from '../map/maps';
 import { Navigator } from '../map/nav';
 import { T } from '../map/tiles';
@@ -613,7 +613,7 @@ export class World {
     if (a.action) return;
     if (kind === 'container') {
       const c = this.containers.get(Number(id));
-      if (!c || dist(a.x, a.y, c.x, c.y) > INTERACT_RANGE + 14) return;
+      if (!c || dist(a.x, a.y, c.x, c.y) > INTERACT_RANGE + 14 || !this.map.clearLine(a.x, a.y, c.x, c.y, F_SIGHT)) return;
       if (c.searched.includes(a.id) || c.kind === 'corpse' || c.kind === 'drop') {
         this.openContainer(a, c);
       } else {
@@ -836,7 +836,13 @@ export class World {
     this.afterEquipChange(a);
     let c = [...this.containers.values()].find((x) => x.kind === 'drop' && x.dynamic && dist(x.x, x.y, a.x, a.y) < 30);
     if (!c) {
-      c = this.addDynamicContainer('drop', a.x + Math.cos(a.aim) * 14, a.y + Math.sin(a.aim) * 14, [], itemDef(it.id).name);
+      let x = a.x + Math.cos(a.aim) * 14;
+      let y = a.y + Math.sin(a.aim) * 14;
+      if (!this.map.clearLine(a.x, a.y, x, y, F_SIGHT | F_MOVE)) {
+        x = a.x;
+        y = a.y;
+      }
+      c = this.addDynamicContainer('drop', x, y, [], itemDef(it.id).name);
     }
     addUnchecked(c.items, it);
     c.searched.push(a.id);
@@ -943,7 +949,7 @@ export class World {
         armor.dur = Math.max(0, (armor.dur ?? 0) - dmg * 0.3);
       }
       this.damage(a, dmg, owner, 'frag', false);
-      if (a.alive && this.rng.chance(0.5)) a.bleeding = true;
+      if (a.alive && a.kind === 'player' && this.rng.chance(0.5)) a.bleeding = true;
     }
   }
 
@@ -965,8 +971,10 @@ export class World {
       attacker.scavAngry = true;
       this.msg(attacker.id, 'Du hast auf Plünderer geschossen – sie sind jetzt feindlich!', 'warn');
     }
-    if (target.action && target.action.type !== 'heal' && target.action.type !== 'selfrevive') target.action = null;
-    if (target.kind === 'bot' && attacker) onBotDamaged(this, target, attacker);
+    // Blutungs-Ticks unterbrechen keine Aktionen und alarmieren keine Bots
+    const hit = amount >= 2 && weapon !== 'bleed';
+    if (hit && target.action && target.action.type !== 'heal' && target.action.type !== 'selfrevive') target.action = null;
+    if (hit && target.kind === 'bot' && attacker) onBotDamaged(this, target, attacker);
     if (target.hp <= 0) {
       target.hp = 0;
       if (target.kind === 'player') this.downOrKill(target, attacker, weapon, head);
@@ -999,9 +1007,9 @@ export class World {
     items.push(...v.inv.bag);
     const corpse = this.addDynamicContainer('corpse', v.x, v.y, items, v.kind === 'player' ? v.name : v.name, victimType);
     corpse.rot = v.aim;
-    let wname = weapon === 'frag' ? 'Granate' : weapon;
+    let wname = weapon === 'frag' ? 'Granate' : weapon === 'bleed' ? 'Blutung' : weapon;
     try {
-      if (weapon !== 'frag') wname = itemDef(weapon).short;
+      if (weapon !== 'frag' && weapon !== 'bleed') wname = itemDef(weapon).short;
     } catch {
       /* unbekannt */
     }
@@ -1392,7 +1400,7 @@ export class World {
         if (owner?.stats) owner.stats.hits++;
         const wasAlive = best.alive && !best.downed;
         this.damage(best, dmg, owner ?? null, b.weapon, res.head);
-        if (res.bleed && best.alive && !best.downed) best.bleeding = true;
+        if (res.bleed && best.kind === 'player' && best.alive && !best.downed) best.bleeding = true;
         if (res.armorHit) this.invChanged(best);
         this.emit({ e: 'hit', b: b.id, x: hx, y: hy, id: best.id, by: b.owner, d: Math.round(dmg), ar: res.armorHit && !res.penetrated, hd: res.head, k: wasAlive && (!best.alive || best.downed) });
         continue;
