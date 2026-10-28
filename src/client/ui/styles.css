@@ -1172,11 +1172,13 @@ h3 {
   width: 96px;
   height: 96px;
 }
-@media (max-height: 380px) {
+@media (max-height: 440px) {
+  /* Auf niedrigen Touch-Displays würde die Minikarte die rechten Knöpfe verdecken */
   .touch .minimap {
-    width: 76px;
-    height: 76px;
+    display: none;
   }
+}
+@media (max-height: 380px) {
   .touch .hud .tl {
     width: 150px;
   }
