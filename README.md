@@ -2,7 +2,7 @@
 
 Ein **Top-Down Extraction Shooter** im Stil von *Escape from Tarkov* und *DMZ* – spielbar im Browser auf **PC und iPhone**, **solo** oder im **Coop** (bis zu 4 Spieler).
 
-### ▶ Jetzt spielen: **https://tumbeldor.github.io/ExtractionLooter/**
+### ▶ Jetzt spielen: **https://tumbeldor.github.io/Exfil/**
 
 Einfach den Link teilen – Solo und Coop laufen direkt im Browser, ohne Installation und ohne eigenen Server. Für Coop erstellt einer unter **Coop → Lobby erstellen** eine Lobby und schickt den **Einladungslink**; wer ihn öffnet, landet direkt in der Lobby.
 
