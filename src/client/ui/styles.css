@@ -245,8 +245,19 @@ h3 {
 
 .menu-screen {
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
+  overflow-y: auto;
   background: radial-gradient(900px 600px at 50% 20%, #1e2a2e 0%, #0b0e10 70%);
+}
+/* zentriert, solange Platz ist – sonst scrollbar statt oben/unten abgeschnitten */
+.menu-screen > :first-child {
+  margin-top: auto;
+}
+.menu-screen > :last-child {
+  margin-bottom: auto;
+}
+.menu-help {
+  margin-top: 12px;
 }
 .menu-screen::before {
   content: '';
@@ -254,6 +265,15 @@ h3 {
   inset: 0;
   background-image: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 4px);
   pointer-events: none;
+}
+.orient-hint {
+  margin-top: 8px;
+  text-align: center;
+}
+@media (orientation: portrait) and (max-width: 700px) {
+  .orient-hint {
+    color: var(--accent);
+  }
 }
 .title {
   text-align: center;
@@ -266,6 +286,10 @@ h3 {
   color: var(--accent);
   text-shadow: 0 3px 0 #4a3a12, 0 0 40px rgba(210, 172, 78, 0.25);
   line-height: 1;
+}
+.title .t1b {
+  font-size: clamp(26px, 5vw, 46px);
+  color: #cfd6c8;
 }
 .title .t2 {
   font-size: clamp(12px, 2vw, 15px);
@@ -1569,5 +1593,35 @@ h3 {
   }
   .menu-screen .profile-chip {
     margin-top: 8px;
+    padding: 6px 14px;
+  }
+  .menu-screen .level-badge {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+  .menu-screen .title {
+    margin-bottom: 8px;
+  }
+  .title .t1 {
+    font-size: clamp(28px, 10vh, 46px);
+  }
+  .title .t1b {
+    font-size: clamp(22px, 7vh, 34px);
+  }
+  .title .t2 {
+    margin-top: 4px;
+    font-size: 11px;
+  }
+  .menu-screen .menu-buttons .btn {
+    min-height: 42px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+  .menu-help {
+    margin-top: 8px;
+  }
+  .orient-hint {
+    margin-top: 4px;
   }
 }

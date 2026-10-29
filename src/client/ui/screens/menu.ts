@@ -37,7 +37,7 @@ export function menuScreen(app: App): HTMLElement {
         h('h3', null, 'PC'),
         h('p', { class: 'small' }, 'WASD bewegen · Shift sprinten · Maus zielen, Linksklick feuern, Rechtsklick genau zielen · R nachladen · Q/Mausrad/1/2 Waffe wechseln · E interagieren · Tab Inventar · H heilen · 4 Verband · 6 Adrenalin · G Granate · Z/Mittlere Maustaste markieren · M Karte · O Extraktionen · Esc Menü'),
         h('h3', null, 'iPhone / Touch'),
-        h('p', { class: 'small' }, 'Linker Daumen: Bewegungsstick (über den Rand ziehen = sprinten). Rechter Daumen: Zielstick – weit ausgelenkt wird gefeuert. Buttons für Nachladen, Zielfernrohr, Heilen, Granate, Waffenwechsel, Inventar, Karte und Markierung. Für Vollbild: in Safari „Teilen → Zum Home-Bildschirm“.'),
+        h('p', { class: 'small' }, 'Bitte im Querformat spielen. Linker Daumen: Bewegungsstick (über den Rand ziehen = sprinten). Rechter Daumen: Zielstick – weit ausgelenkt wird gefeuert. Buttons für Nachladen, Zielfernrohr, Heilen, Granate, Waffenwechsel, Inventar, Karte und Markierung. Für Vollbild: in Safari „Teilen → Zum Home-Bildschirm“.'),
         h('h3', null, 'Gamepad'),
         h('p', { class: 'small' }, 'Linker Stick bewegen, rechter Stick zielen, RT feuern, LT zielen, A interagieren, X nachladen, Y Waffe wechseln, B heilen, RB Granate, Steuerkreuz ↑ Inventar.'),
         h('h3', null, 'Extraktionen'),
@@ -47,7 +47,7 @@ export function menuScreen(app: App): HTMLElement {
   return h(
     'div',
     { class: 'screen menu-screen' },
-    h('div', { class: 'title' }, h('div', { class: 't1' }, 'EXTRACTION'), h('div', { class: 't1', style: { fontSize: 'clamp(26px,5vw,46px)', color: '#cfd6c8' } }, 'LOOTER'), h('div', { class: 't2' }, 'Sperrzone · Top-Down Extraction Shooter')),
+    h('div', { class: 'title' }, h('div', { class: 't1' }, 'EXTRACTION'), h('div', { class: 't1 t1b' }, 'LOOTER'), h('div', { class: 't2' }, 'Sperrzone · Top-Down Extraction Shooter')),
     h(
       'div',
       { class: 'menu-buttons' },
@@ -57,6 +57,7 @@ export function menuScreen(app: App): HTMLElement {
       h('button', { class: 'btn', onclick: () => app.goSettings() }, h('span', null, 'Einstellungen', h('span', { class: 'sub' }, 'Steuerung · Grafik · Ton'))),
     ),
     profileChip(app),
-    h('div', { class: 'row gap', style: { marginTop: '12px' } }, h('button', { class: 'btn small', onclick: help }, 'Anleitung'), ios && !standalone ? h('span', { class: 'tiny muted' }, 'Tipp: Teilen → „Zum Home-Bildschirm“ für Vollbild') : null),
+    h('div', { class: 'row gap menu-help' }, h('button', { class: 'btn small', onclick: help }, 'Anleitung'), ios && !standalone ? h('span', { class: 'tiny muted' }, 'Tipp: Teilen → „Zum Home-Bildschirm“ für Vollbild') : null),
+    h('div', { class: 'tiny muted orient-hint' }, '📱 Am Handy bitte alles im Querformat spielen – Gerät quer halten.'),
   );
 }
