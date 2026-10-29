@@ -55,7 +55,7 @@ if (existing) {
   const screen = h(
     'div',
     { class: 'screen menu-screen' },
-    h('div', { class: 'title' }, h('div', { class: 't1' }, 'EXTRACTION'), h('div', { class: 't1 t1b' }, 'LOOTER'), h('div', { class: 't2' }, 'Sperrzone')),
+    h('div', { class: 'title' }, h('div', { class: 't1' }, 'EXFIL'), h('div', { class: 't2' }, 'Sperrzone')),
     h(
       'div',
       { class: 'panel col gap', style: { padding: '18px', maxWidth: '380px', alignItems: 'stretch' } },

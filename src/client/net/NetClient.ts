@@ -4,7 +4,7 @@ import { type Socket, type SocketFactory } from './sockets';
 
 type Listener<T> = (m: T) => void;
 
-const TOKEN_KEY = 'xl.net.token';
+const TOKEN_KEY = 'exfil.net.token';
 
 export function defaultServerUrl(custom: string): string {
   if (custom.trim()) {

@@ -65,6 +65,6 @@ wss.on('connection', (ws) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Extraction Looter Server läuft auf http://localhost:${PORT}`);
+  console.log(`Exfil-Server läuft auf http://localhost:${PORT}`);
   console.log(`Client-Dateien: ${DIST}`);
 });

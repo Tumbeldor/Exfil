@@ -1,5 +1,5 @@
 {
-  "name": "extraction-looter",
+  "name": "exfil",
   "version": "0.1.0",
   "private": true,
   "description": "Top-Down Extraction Shooter (Solo & Coop) für Browser, iPhone und PC",

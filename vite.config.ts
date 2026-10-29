@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  // relative Pfade: läuft unter / (eigener Server) und unter /ExtractionLooter/ (GitHub Pages)
+  // relative Pfade: läuft unter / (eigener Server) und unter /<repo-name>/ (GitHub Pages)
   base: './',
   server: {
     host: true,

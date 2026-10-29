@@ -7,7 +7,7 @@ import { type Socket, type SocketFactory, loopbackSocket } from './sockets';
  * Gäste verbinden sich über den Lobby-Code. Kein eigener Server nötig – ideal für GitHub Pages.
  */
 
-const PREFIX = 'extractionlooter-v1-';
+const PREFIX = 'exfil-game-v1-';
 type PeerCtor = new (id?: string, opts?: PeerOptions) => PeerType;
 
 let PeerClass: PeerCtor | null = null;

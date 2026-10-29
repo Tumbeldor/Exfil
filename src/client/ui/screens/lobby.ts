@@ -17,10 +17,10 @@ export function kitPayload(app: App): JoinPayload {
 
 /** Einladungslink teilen: native Teilen-Funktion (iPhone), sonst Zwischenablage, sonst anzeigen. */
 export async function shareInvite(url: string, code: string) {
-  const text = `Komm in meine Extraction-Looter-Lobby! Code: ${code}`;
+  const text = `Komm in meine Exfil-Lobby! Code: ${code}`;
   if (navigator.share) {
     try {
-      await navigator.share({ title: 'Extraction Looter – Coop', text, url });
+      await navigator.share({ title: 'Exfil – Coop', text, url });
       return;
     } catch (e) {
       if ((e as Error).name === 'AbortError') return;

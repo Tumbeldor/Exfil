@@ -1,6 +1,6 @@
 {
-  "name": "Extraction Looter",
-  "short_name": "Extraction",
+  "name": "Exfil",
+  "short_name": "Exfil",
   "description": "Top-Down Extraction Shooter – Solo & Coop",
   "start_url": "./",
   "scope": "./",

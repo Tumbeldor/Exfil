@@ -1,5 +1,5 @@
 // Einfacher Offline-Cache: Netzwerk zuerst, sonst Cache (Solo spielbar ohne Verbindung)
-const CACHE = 'xl-v2';
+const CACHE = 'exfil-v1';
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) =>
   e.waitUntil(

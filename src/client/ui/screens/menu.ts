@@ -47,7 +47,7 @@ export function menuScreen(app: App): HTMLElement {
   return h(
     'div',
     { class: 'screen menu-screen' },
-    h('div', { class: 'title' }, h('div', { class: 't1' }, 'EXTRACTION'), h('div', { class: 't1 t1b' }, 'LOOTER'), h('div', { class: 't2' }, 'Sperrzone · Top-Down Extraction Shooter')),
+    h('div', { class: 'title' }, h('div', { class: 't1' }, 'EXFIL'), h('div', { class: 't2' }, 'Sperrzone · Top-Down Extraction Shooter')),
     h(
       'div',
       { class: 'menu-buttons' },

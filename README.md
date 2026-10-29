@@ -1,4 +1,4 @@
-# Extraction Looter
+# Exfil
 
 Ein **Top-Down Extraction Shooter** im Stil von *Escape from Tarkov* und *DMZ* – spielbar im Browser auf **PC und iPhone**, **solo** oder im **Coop** (bis zu 4 Spieler).
 
@@ -65,13 +65,13 @@ Das Spiel wird bei jedem Push automatisch gebaut und veröffentlicht (`.github/w
 
 **Repository → Settings → Pages → Build and deployment → Source: „GitHub Actions“**
 
-Danach unter **Actions → GitHub Pages → Run workflow** einmal starten (oder einfach etwas pushen). Die Adresse lautet `https://<benutzername>.github.io/ExtractionLooter/`.
+Danach unter **Actions → GitHub Pages → Run workflow** einmal starten (oder einfach etwas pushen). Die Adresse lautet `https://<benutzername>.github.io/<repo-name>/`.
 
 ### Docker
 
 ```bash
-docker build -t extraction-looter .
-docker run -p 3000:3000 extraction-looter
+docker build -t exfil .
+docker run -p 3000:3000 exfil
 ```
 
 ## Steuerung

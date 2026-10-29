@@ -1,3 +1,5 @@
+import { readStored } from './storage';
+
 export interface Settings {
   volume: number;
   aimAssist: boolean;
@@ -30,11 +32,11 @@ export const DEFAULT_SETTINGS: Settings = {
   forceTouch: 'auto',
 };
 
-const KEY = 'xl.settings.v1';
+const KEY = 'exfil.settings.v1';
 
 export function loadSettings(): Settings {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = readStored(KEY, 'xl.settings.v1');
     if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
   } catch {
     /* privater Modus o. ä. */
