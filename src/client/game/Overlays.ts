@@ -6,6 +6,7 @@ import type { PlayerAction } from '../../shared/sim/types';
 import { slotForDef } from '../../shared/inventory';
 import { clear, h } from '../ui/dom';
 import { contextMenu, emptySlot, itemTile } from '../ui/itemUi';
+import type { Effects, Ping } from './Effects';
 import { exText } from './Hud';
 import type { ViewState } from './ViewState';
 
@@ -216,26 +217,47 @@ export class MapOverlay {
   root: HTMLElement;
   private canvas: HTMLCanvasElement;
   private legend: HTMLElement;
+  private legendBody: HTMLElement;
+  private clearBtn: HTMLElement;
+  private fx: Effects | null = null;
   open = false;
 
   constructor(
     parent: HTMLElement,
     private view: ViewState,
     private overview: HTMLCanvasElement,
-    private onPing: (x: number, y: number) => void,
+    private onAction: (a: Extract<PlayerAction, { a: 'ping' | 'unping' }>) => void,
     private onClose: () => void,
   ) {
     this.canvas = h('canvas');
-    this.legend = h('div', { class: 'legend' });
-    this.root = h('div', { class: 'overlay map-overlay hidden', style: { alignItems: 'center' } }, this.canvas, this.legend, h('button', { class: 'btn small', style: { position: 'absolute', right: 'calc(12px + var(--sar))', top: 'calc(12px + var(--sat))' }, onclick: () => this.close() }, 'Schließen ✕'));
+    this.legendBody = h('div', { class: 'legend-body' });
+    // auf kleinen Bildschirmen eingeklappt, damit die Liste die Karte nicht verdeckt
+    this.legend = h(
+      'div',
+      { class: 'legend' + (window.innerHeight < 560 ? ' collapsed' : '') },
+      h('button', { class: 'legend-toggle', onclick: () => this.legend.classList.toggle('collapsed') }, 'Extraktionen'),
+      this.legendBody,
+      h('div', { class: 'muted tiny legend-hint' }, 'Tippen = Markierung setzen · eigene Markierung antippen = löschen'),
+    );
+    this.clearBtn = h('button', { class: 'btn small', onclick: () => this.onAction({ a: 'unping' }) }, 'Markierungen löschen');
+    this.root = h(
+      'div',
+      { class: 'overlay map-overlay hidden', style: { alignItems: 'center' } },
+      this.canvas,
+      this.legend,
+      h('div', { class: 'row gap map-buttons' }, this.clearBtn, h('button', { class: 'btn small', onclick: () => this.close() }, 'Schließen ✕')),
+    );
     this.root.addEventListener('pointerdown', (e) => {
       if (e.target === this.root) this.close();
     });
     this.canvas.addEventListener('pointerdown', (e) => {
       const r = this.canvas.getBoundingClientRect();
-      const fx = (e.clientX - r.left) / r.width;
-      const fy = (e.clientY - r.top) / r.height;
-      this.onPing(fx * this.view.map.pixelW, fy * this.view.map.pixelH);
+      const x = ((e.clientX - r.left) / r.width) * this.view.map.pixelW;
+      const y = ((e.clientY - r.top) / r.height) * this.view.map.pixelH;
+      // eigene Markierung antippen = löschen, sonst neue setzen
+      const near = this.fx?.pingNear(this.view.you, x, y, 22 / (r.width / this.view.map.pixelW));
+      if (near) this.onAction({ a: 'unping', x: near.x, y: near.y });
+      else this.onAction({ a: 'ping', x, y, keep: true });
     });
     parent.appendChild(this.root);
   }
@@ -251,8 +273,10 @@ export class MapOverlay {
     this.onClose();
   }
 
-  draw(meX: number, meY: number, aim: number, pings: { x: number; y: number; color: string }[]) {
+  draw(meX: number, meY: number, aim: number, fx: Effects) {
+    this.fx = fx;
     if (!this.open) return;
+    const pings = fx.pings;
     const m = this.view.map;
     const maxW = window.innerWidth - 24;
     const maxH = window.innerHeight - 24;
@@ -281,7 +305,7 @@ export class MapOverlay {
       g.fillText(z.name, (z.x + z.w / 2) * TILE * s, (z.y + z.h / 2) * TILE * s);
     }
     // Extraktionen
-    const legend: string[] = ['<b class="accent">Extraktionen</b>'];
+    const legend: string[] = [];
     for (const def of m.extracts) {
       const st = this.view.extractState(def.id);
       const open = !!st?.open;
@@ -298,9 +322,10 @@ export class MapOverlay {
       g.fillText(def.name, Math.max(tw, Math.min(W - tw, def.x * s)), Math.max(14, def.y * s - 11));
       legend.push(`<div>${def.name}: <span class="${open ? 'good' : 'warn'}">${exText(def, st)}</span></div>`);
     }
-    legend.push('<div class="muted tiny" style="margin-top:4px">Tippen = Markierung setzen</div>');
+    const own = pings.some((p) => p.by === this.view.you);
+    this.clearBtn.classList.toggle('hidden', !own);
     const lh = legend.join('');
-    if (this.legend.innerHTML !== lh) this.legend.innerHTML = lh;
+    if (this.legendBody.innerHTML !== lh) this.legendBody.innerHTML = lh;
     // Squad
     for (const a of this.view.actors.values()) {
       if (a.k !== 'p' || a.i === this.view.you) continue;
@@ -309,13 +334,7 @@ export class MapOverlay {
       g.arc(a.x * s, a.y * s, 5, 0, Math.PI * 2);
       g.fill();
     }
-    for (const p of pings) {
-      g.strokeStyle = p.color;
-      g.lineWidth = 2;
-      g.beginPath();
-      g.arc(p.x * s, p.y * s, 9, 0, Math.PI * 2);
-      g.stroke();
-    }
+    for (const p of pings) drawMapPing(g, p, s, p.by === this.view.you);
     g.fillStyle = '#fff';
     g.beginPath();
     g.arc(meX * s, meY * s, 6, 0, Math.PI * 2);
@@ -325,6 +344,41 @@ export class MapOverlay {
     g.beginPath();
     g.moveTo(meX * s, meY * s);
     g.lineTo(meX * s + Math.cos(aim) * 18, meY * s + Math.sin(aim) * 18);
+    g.stroke();
+  }
+}
+
+/** Markierung auf der Karte: Stecknadel für bleibende, Ring für kurze Markierungen. */
+function drawMapPing(g: CanvasRenderingContext2D, p: Ping, s: number, own: boolean) {
+  const x = p.x * s;
+  const y = p.y * s;
+  if (!p.keep) {
+    g.strokeStyle = p.color;
+    g.lineWidth = 2;
+    g.beginPath();
+    g.arc(x, y, 9, 0, Math.PI * 2);
+    g.stroke();
+    return;
+  }
+  g.fillStyle = p.color;
+  g.strokeStyle = '#000';
+  g.lineWidth = 2;
+  g.beginPath();
+  g.moveTo(x, y);
+  g.bezierCurveTo(x - 10, y - 12, x - 8, y - 22, x, y - 22);
+  g.bezierCurveTo(x + 8, y - 22, x + 10, y - 12, x, y);
+  g.closePath();
+  g.stroke();
+  g.fill();
+  g.fillStyle = '#000';
+  g.beginPath();
+  g.arc(x, y - 15, 3, 0, Math.PI * 2);
+  g.fill();
+  if (own) {
+    g.strokeStyle = 'rgba(255,255,255,0.8)';
+    g.lineWidth = 1.5;
+    g.beginPath();
+    g.arc(x, y, 3.5, 0, Math.PI * 2);
     g.stroke();
   }
 }

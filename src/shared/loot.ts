@@ -42,6 +42,25 @@ const TABLES: Partial<Record<ContainerKind, Table>> = {
   fridge: { rolls: [0, 2], cats: {}, only: ['canned', 'vodka', 'medsupply'], items: { canned: 5, vodka: 3, medsupply: 0.3 } },
 };
 
+/** Wahrscheinlichkeit, dass ein Behälter auf der Karte leer ist (nicht jeder Behälter lohnt sich). */
+const EMPTY_CHANCE: Partial<Record<ContainerKind, number>> = {
+  crate: 0.3,
+  weaponbox: 0.25,
+  ammobox: 0.25,
+  medcase: 0.25,
+  toolbox: 0.3,
+  filing: 0.3,
+  safe: 0.15,
+  jacket: 0.25,
+  pc: 0.3,
+  shelf: 0.35,
+  desk: 0.25,
+  register: 0.35,
+  duffle: 0.25,
+  trunk: 0.35,
+  fridge: 0.25,
+};
+
 function eligible(d: ItemDef, tier: number) {
   return d.rarity > 0 && d.tier <= tier + 1;
 }
@@ -120,6 +139,13 @@ export function rollContainer(kind: ContainerKind, tier: number, rng: Rng): Item
     else out.push(it);
   }
   return out;
+}
+
+/** Behälter auf der Karte: kann leer sein, in gefährlichen Zonen (hohe Stufe) seltener. */
+export function rollMapContainer(kind: ContainerKind, tier: number, rng: Rng): ItemStack[] {
+  const empty = (EMPTY_CHANCE[kind] ?? 0) * (tier >= 3 ? 0.6 : 1);
+  if (rng.chance(empty)) return [];
+  return rollContainer(kind, tier, rng);
 }
 
 /** Lose Bodenbeute */

@@ -1,3 +1,4 @@
+import { lerpAngle } from '../../shared/math';
 import type { Settings } from '../settings';
 import { h, svgEl } from '../ui/dom';
 import { iconSvg } from '../ui/icons';
@@ -47,6 +48,13 @@ interface StickState {
   knob: HTMLElement;
 }
 
+/** Daumenweg in px bis zum Vollausschlag (Stick-Größe Normal, Empfindlichkeit Normal). */
+const STICK_TRAVEL = 72;
+/** Sichtbarer Weg des Knopfes im Ring (unskaliert). */
+const KNOB_TRAVEL = 56;
+const MOVE_DEADZONE = 0.15;
+const AIM_DEADZONE = 0.2;
+
 const KEYMAP: Record<string, InputAction> = {
   KeyR: 'reload',
   KeyQ: 'swap',
@@ -77,6 +85,9 @@ export class Input {
   private playerScreen = { x: 0, y: 0, zoom: 1 };
   private camWorld = { x: 0, y: 0 };
   private lastAim: number | null = null;
+  /** geglätteter Zielwinkel des Touch-Zielsticks */
+  private touchAim: number | null = null;
+  private lastPollT = 0;
   touchMode: boolean;
   private touchRoot: HTMLElement | null = null;
   private moveStick: StickState | null = null;
@@ -259,7 +270,6 @@ export class Input {
     placeGhost();
     this.on(window, 'resize', placeGhost);
 
-    const radius = () => 56 * sz;
     const down = (e: PointerEvent) => {
       if (e.pointerType === 'mouse' || this.blocked) return;
       e.preventDefault();
@@ -282,7 +292,7 @@ export class Input {
         let dx = st.x - st.ox;
         let dy = st.y - st.oy;
         const d = Math.hypot(dx, dy);
-        const r = radius();
+        const r = this.stickRadius();
         // Basis folgt dem Finger, wenn weit außerhalb
         if (d > r * 1.9) {
           const k = (d - r * 1.9) / d;
@@ -293,9 +303,9 @@ export class Input {
           dx = st.x - st.ox;
           dy = st.y - st.oy;
         }
-        const dd = Math.hypot(dx, dy);
-        const kk = dd > r ? r / dd : 1;
-        st.knob.style.transform = `translate(${(dx * kk) / sz}px, ${(dy * kk) / sz}px)`;
+        const dd = Math.hypot(dx, dy) || 1;
+        const kk = (Math.min(1, dd / r) * KNOB_TRAVEL) / dd;
+        st.knob.style.transform = `translate(${dx * kk}px, ${dy * kk}px)`;
       }
     };
     const up = (e: PointerEvent) => {
@@ -309,6 +319,7 @@ export class Input {
         this.aimStick.el.classList.add('ghost');
         this.aimStick.knob.style.transform = '';
         this.aimStick = null;
+        this.touchAim = null;
         placeGhost();
       }
     };
@@ -318,12 +329,17 @@ export class Input {
     this.on(window, 'pointercancel', up);
   }
 
+  /** Weg bis Vollausschlag: größerer Stick und niedrigere Empfindlichkeit brauchen mehr Daumenweg. */
+  private stickRadius() {
+    return (STICK_TRAVEL * this.settings.stickSize) / (this.settings.stickSens || 1);
+  }
+
   private stickVec(st: StickState | null): { x: number; y: number; m: number; over: number } {
     if (!st) return { x: 0, y: 0, m: 0, over: 0 };
     const dx = st.x - st.ox;
     const dy = st.y - st.oy;
     const d = Math.hypot(dx, dy);
-    const r = 56 * this.settings.stickSize;
+    const r = this.stickRadius();
     const m = Math.min(1, d / r);
     if (d < 1e-3) return { x: 0, y: 0, m: 0, over: 0 };
     return { x: (dx / d) * m, y: (dy / d) * m, m, over: d / r };
@@ -387,7 +403,11 @@ export class Input {
     return { x: this.mouse.x - window.innerWidth / 2, y: this.mouse.y - window.innerHeight / 2 };
   }
 
-  poll(): InputFrame {
+  /** @param curAim aktuelle Blickrichtung der Figur (Startwert für den Touch-Zielstick) */
+  poll(curAim?: number): InputFrame {
+    const now = performance.now();
+    const dt = Math.min(0.05, Math.max(0, (now - this.lastPollT) / 1000));
+    this.lastPollT = now;
     const f: InputFrame = {
       moveX: 0,
       moveY: 0,
@@ -430,18 +450,26 @@ export class Input {
     // Touch
     if (this.touchMode) {
       const mv = this.stickVec(this.moveStick);
-      if (mv.m > 0.12) {
-        f.moveX = mv.x;
-        f.moveY = mv.y;
-        if (mv.over > 1.3) f.sprint = true;
+      if (mv.m > MOVE_DEADZONE) {
+        // weiche Kennlinie: kleine Ausschläge = langsames, genaues Gehen
+        const t = (mv.m - MOVE_DEADZONE) / (1 - MOVE_DEADZONE);
+        const k = (0.08 + 0.92 * Math.pow(t, 1.35)) / mv.m;
+        f.moveX = mv.x * k;
+        f.moveY = mv.y * k;
+        if (mv.over > 1.4) f.sprint = true;
       }
-      if (this.sprintToggle && mv.m > 0.12) f.sprint = true;
+      if (this.sprintToggle && mv.m > MOVE_DEADZONE) f.sprint = true;
       const av = this.stickVec(this.aimStick);
-      if (this.aimStick && av.m > 0.08) {
-        f.aim = Math.atan2(av.y, av.x);
+      if (this.aimStick && av.m > AIM_DEADZONE) {
+        // Blickrichtung dreht zum Stick hin statt zu springen; kleine Ausschläge und Zielfernrohr drehen langsamer
+        const target = Math.atan2(av.y, av.x);
+        const from = this.touchAim ?? curAim ?? this.lastAim ?? target;
+        const rate = 15 * (this.settings.stickSens || 1) * (0.45 + 0.55 * av.m) * (this.adsToggle ? 0.6 : 1);
+        this.touchAim = lerpAngle(from, target, 1 - Math.exp(-rate * dt));
+        f.aim = this.touchAim;
         f.aimActive = true;
         f.aimDist = 120 + av.m * 300;
-        if (this.settings.touchAutoFire && av.m > 0.62) {
+        if (this.settings.touchAutoFire && av.m > 0.7) {
           f.fire = true;
         }
       } else if (this.lastAim !== null && this.aimStick) {

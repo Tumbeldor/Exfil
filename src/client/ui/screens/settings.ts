@@ -36,6 +36,7 @@ export function settingsScreen(app: App): HTMLElement {
           sw('touchAutoFire', 'Feuern per Zielstick', 'Rechten Stick weit auslenken = schießen. Aus: eigener Feuerknopf.'),
           sw('aimAssist', 'Zielhilfe (Touch/Gamepad)', 'Zielt leicht auf sichtbare Gegner in Blickrichtung.'),
           chips('stickSize', 'Stick-Größe', 'Größe der virtuellen Sticks.', [[0.85, 'Klein'], [1, 'Normal'], [1.2, 'Groß']]),
+          chips('stickSens', 'Stick-Empfindlichkeit', 'Wie stark die Sticks auf kleine Daumenbewegungen reagieren.', [[0.75, 'Niedrig'], [1, 'Normal'], [1.3, 'Hoch']]),
           sw('vibrate', 'Vibration', 'Haptisches Feedback (wo unterstützt).'),
           sw('autoReload', 'Automatisch nachladen', 'Bei leerem Magazin beim Abdrücken nachladen.'),
           chips('zoom', 'Kamera-Zoom', 'Wie viel von der Umgebung sichtbar ist.', [[1.2, 'Nah'], [1, 'Normal'], [0.82, 'Weit']]),

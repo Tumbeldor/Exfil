@@ -231,7 +231,9 @@ export type PlayerAction =
   | { a: 'unequip'; slot: EquipSlot }
   | { a: 'drop'; uid: string; n?: number }
   | { a: 'throw'; x: number; y: number }
-  | { a: 'ping'; x: number; y: number }
+  | { a: 'ping'; x: number; y: number; keep?: boolean }
+  /** eigene Markierung an (x, y) entfernen, ohne Koordinaten: alle eigenen */
+  | { a: 'unping'; x?: number; y?: number }
   | { a: 'close' }
   | { a: 'cancel' };
 
@@ -253,7 +255,8 @@ export type GameEvent = { t?: number; to?: number } & (
   | { e: 'revived'; id: number; by: number }
   | { e: 'tile'; tx: number; ty: number; v: number }
   | { e: 'msg'; text: string; kind?: 'info' | 'warn' | 'good' | 'quest' }
-  | { e: 'ping'; x: number; y: number; by: number; name: string }
+  | { e: 'ping'; x: number; y: number; by: number; name: string; keep?: boolean }
+  | { e: 'unping'; by: number; x?: number; y?: number }
   | { e: 'container'; c: ContainerInfo }
   | { e: 'cremove'; c: number }
   | { e: 'noise'; x: number; y: number }

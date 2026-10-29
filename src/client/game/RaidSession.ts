@@ -218,9 +218,7 @@ export class RaidSession {
       this.root,
       v,
       this.renderer.painter.overviewCanvas(),
-      (x, y) => {
-        this.opts.link.send({ type: 'act', a: { a: 'ping', x, y } });
-      },
+      (a) => this.opts.link.send({ type: 'act', a }),
       () => {
         this.input.blocked = false;
       },
@@ -247,7 +245,7 @@ export class RaidSession {
     const v = this.view;
     if (!v || !this.renderer || !this.hud) return;
     const now = performance.now() / 1000;
-    const f = this.input.poll();
+    const f = this.input.poll(this.aim);
     const me = v.me;
     const alive = this.ready && !!me && me.alive && !this.finished;
 
@@ -271,7 +269,7 @@ export class RaidSession {
       } else if (silent < 1) this.stallWarned = false;
     }
     v.interpolate(now, dt);
-    const evs = v.takeEvents(now, (e) => e.to === v.you || e.e === 'msg' || e.e === 'xp' || e.e === 'searched' || e.e === 'tile' || e.e === 'container' || e.e === 'cremove' || e.e === 'ping');
+    const evs = v.takeEvents(now, (e) => e.to === v.you || e.e === 'msg' || e.e === 'xp' || e.e === 'searched' || e.e === 'tile' || e.e === 'container' || e.e === 'cremove' || e.e === 'ping' || e.e === 'unping');
     for (const e of evs) this.applyEvent(e, now);
 
     this.renderer.effects.update(dt);
@@ -345,7 +343,7 @@ export class RaidSession {
         this.input.setButtonCount('grenade', g);
       }
     }
-    this.mapUi?.draw(this.x, this.y, this.aim, this.renderer.effects.pings);
+    this.mapUi?.draw(this.x, this.y, this.aim, this.renderer.effects);
     // Herzschlag bei wenig HP
     if (alive && me && me.hp / me.mhp < 0.3) {
       this.heartT -= dt;
@@ -420,7 +418,12 @@ export class RaidSession {
         }
         case 'ping': {
           const d = Math.min(600, this.lastAimDist);
-          send({ a: 'ping', x: this.x + Math.cos(this.aim) * d, y: this.y + Math.sin(this.aim) * d });
+          const px = this.x + Math.cos(this.aim) * d;
+          const py = this.y + Math.sin(this.aim) * d;
+          // erneut auf eine eigene Markierung zeigen = sie entfernen
+          const old = this.renderer?.effects.pingNear(this.view!.you, px, py, 40);
+          if (old) send({ a: 'unping', x: old.x, y: old.y });
+          else send({ a: 'ping', x: px, y: py });
           break;
         }
         case 'interact':
@@ -714,10 +717,13 @@ export class RaidSession {
         break;
       case 'ping': {
         const sq = v.info.squad.find((s) => s.id === e.by);
-        fx.pings.push({ x: e.x, y: e.y, t: now, name: e.name, color: sq?.color ?? '#f0c860' });
+        fx.addPing({ x: e.x, y: e.y, t: now, name: e.name, color: sq?.color ?? '#f0c860', by: e.by, keep: !!e.keep });
         audio.ui('beep');
         break;
       }
+      case 'unping':
+        fx.removePings(e.by, e.x, e.y);
+        break;
       case 'container':
         v.containers.set(e.c.id, { ...e.c });
         break;

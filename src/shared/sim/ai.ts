@@ -11,10 +11,10 @@ import type { World } from './World';
 const DEG = Math.PI / 180;
 
 const BASE: Record<BotType, BotSkill> = {
-  scav: { view: 650, fov: 115 * DEG, react: 0.8, aimErr: 0.115, turn: 5.2, speed: 0.92, burstMin: 2, burstMax: 4, aggression: 0.5, hearing: 1 },
-  pmc: { view: 820, fov: 130 * DEG, react: 0.55, aimErr: 0.078, turn: 7, speed: 1.0, burstMin: 3, burstMax: 5, aggression: 0.75, hearing: 1.2 },
-  guard: { view: 780, fov: 125 * DEG, react: 0.55, aimErr: 0.075, turn: 7, speed: 0.95, burstMin: 3, burstMax: 6, aggression: 0.55, hearing: 1.15 },
-  boss: { view: 880, fov: 140 * DEG, react: 0.4, aimErr: 0.052, turn: 8, speed: 0.92, burstMin: 4, burstMax: 9, aggression: 0.8, hearing: 1.3 },
+  scav: { view: 650, fov: 115 * DEG, react: 1.05, aimErr: 0.14, turn: 4.8, speed: 0.92, burstMin: 2, burstMax: 4, aggression: 0.5, hearing: 1 },
+  pmc: { view: 820, fov: 130 * DEG, react: 0.72, aimErr: 0.095, turn: 6.4, speed: 1.0, burstMin: 3, burstMax: 5, aggression: 0.75, hearing: 1.2 },
+  guard: { view: 780, fov: 125 * DEG, react: 0.72, aimErr: 0.092, turn: 6.4, speed: 0.95, burstMin: 3, burstMax: 6, aggression: 0.55, hearing: 1.15 },
+  boss: { view: 880, fov: 140 * DEG, react: 0.52, aimErr: 0.064, turn: 7.4, speed: 0.92, burstMin: 4, burstMax: 9, aggression: 0.8, hearing: 1.3 },
 };
 
 export function botSkill(type: BotType, difficulty: number): BotSkill {
@@ -565,7 +565,7 @@ function combat(world: World, a: Actor, dt: number, wd: ReturnType<typeof weapon
     if (br.reactT <= 0 && off < 0.14 && wd && d < wd.range * 0.95 && br.burstPause <= 0) {
       if (!friendlyInLine(world, a, t.x, t.y)) {
         const speed = Math.hypot(t.vx, t.vy);
-        let err = br.skill.aimErr * (1.6 - Math.min(1, br.trackT / 1.8) * 0.9) * (1 + speed / 320);
+        let err = br.skill.aimErr * (1.6 - Math.min(1, br.trackT / 2.4) * 0.9) * (1 + speed / 320);
         if (TILE_FLAGS[world.map.tileAtWorld(t.x, t.y)] & F_SLOW) err *= 1.35;
         if (d > 600) err *= 1.2;
         if (t.downed) err *= 0.7;
@@ -573,7 +573,7 @@ function combat(world: World, a: Actor, dt: number, wd: ReturnType<typeof weapon
           br.burst--;
           if (br.burst <= 0) {
             br.burst = world.rng.int(br.skill.burstMin, br.skill.burstMax);
-            br.burstPause = wd.auto ? world.rng.range(0.35, 0.9) : world.rng.range(0.15, 0.5);
+            br.burstPause = wd.auto ? world.rng.range(0.45, 1.1) : world.rng.range(0.2, 0.6);
           }
         }
       } else {

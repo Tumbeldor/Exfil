@@ -13,6 +13,8 @@ export interface Settings {
   difficulty: number;
   serverUrl: string;
   stickSize: number;
+  /** Empfindlichkeit der Touch-Sticks (1 = normal) */
+  stickSens: number;
   forceTouch: 'auto' | 'on' | 'off';
 }
 
@@ -29,6 +31,7 @@ export const DEFAULT_SETTINGS: Settings = {
   difficulty: 1,
   serverUrl: '',
   stickSize: 1,
+  stickSens: 1,
   forceTouch: 'auto',
 };
 

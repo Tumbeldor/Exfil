@@ -78,6 +78,7 @@ export class NetClient {
     this.ws = ws;
     let opened = false;
     ws.onopen = () => {
+      if (this.ws !== ws || opened) return;
       opened = true;
       this.everOpened = true;
       this.retry = 0;
@@ -89,10 +90,12 @@ export class NetClient {
         token = undefined;
       }
       this.send({ type: 'hello', v: PROTOCOL_VERSION, token, name: this.name });
+      if (this.pingTimer) clearInterval(this.pingTimer);
       this.pingTimer = window.setInterval(() => this.send({ type: 'ping', t: performance.now() }), 2000);
       onOpen?.();
     };
     ws.onmessage = (data) => {
+      if (this.ws !== ws) return;
       let m: ServerMsg;
       try {
         m = JSON.parse(data);
@@ -102,9 +105,9 @@ export class NetClient {
       this.dispatch(m);
     };
     ws.onclose = () => {
+      if (this.ws !== ws) return;
       if (this.pingTimer) clearInterval(this.pingTimer);
       this.pingTimer = null;
-      if (this.ws !== ws) return;
       this.ws = null;
       if (!opened && !this.everOpened) {
         this.setState('closed');
@@ -194,6 +197,8 @@ export class NetClient {
   close() {
     this.wantOpen = false;
     this.send({ type: 'leave' });
+    if (this.pingTimer) clearInterval(this.pingTimer);
+    this.pingTimer = null;
     const ws = this.ws;
     this.ws = null;
     // "leave" noch zustellen lassen

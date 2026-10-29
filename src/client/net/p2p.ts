@@ -78,6 +78,8 @@ export class P2PHost {
     this.server = new LobbyServer({ ticker: workerTicker, singleLobby: true });
     peer.on('connection', (conn) => {
       conn.on('open', () => {
+        // „open“ kann bei PeerJS doppelt kommen – sonst würde der Gast zweimal angemeldet
+        if (this.conns.has(conn)) return;
         this.conns.add(conn);
         let closed = false;
         const h = this.server.attach({
@@ -199,19 +201,28 @@ export function guestSocketFactory(code: string): SocketFactory {
           }
         };
         peer.on('error', onPeerErr);
-        conn = peer.connect(target, { reliable: true, serialization: 'raw' });
-        conn.on('open', () => {
+        const c = peer.connect(target, { reliable: true, serialization: 'raw' });
+        conn = c;
+        c.on('open', () => {
+          if (finished) {
+            // zu spät geöffnet (Zeitüberschreitung): nicht mehr verwenden
+            c.close();
+            return;
+          }
+          if (open) return;
           clearTimeout(timer);
           peer.off('error', onPeerErr);
           open = true;
           s.onopen?.();
         });
-        conn.on('data', (d) => s.onmessage?.(String(d)));
-        conn.on('close', () => {
+        c.on('data', (d) => {
+          if (!finished) s.onmessage?.(String(d));
+        });
+        c.on('close', () => {
           peer.off('error', onPeerErr);
           finish();
         });
-        conn.on('error', () => finish());
+        c.on('error', () => finish());
       })
       .catch(() => finish());
     return s;

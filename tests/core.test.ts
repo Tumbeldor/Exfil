@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { TILE } from '../src/shared/constants';
 import { addToList, bagCapacity, emptyInventory, equipFromList, fitAmount, slotsUsed, starterInventory, takeFromList } from '../src/shared/inventory';
 import { createItem, stackSlots } from '../src/shared/items';
-import { rollContainer, botLoadout } from '../src/shared/loot';
+import { rollContainer, rollMapContainer, botLoadout } from '../src/shared/loot';
 import { buildMap, MAP_METAS } from '../src/shared/map/maps';
 import { Navigator } from '../src/shared/map/nav';
 import { F_SIGHT } from '../src/shared/map/tiles';
@@ -54,6 +54,20 @@ describe('Beute', () => {
       for (let i = 0; i < 20; i++) total += rollContainer(k, 2, rng).length;
       expect(total, k).toBeGreaterThan(0);
     }
+  });
+
+  it('Behälter auf der Karte sind manchmal leer, in gefährlichen Zonen seltener', () => {
+    const rng = new Rng(11);
+    const emptyShare = (tier: number) => {
+      let empty = 0;
+      for (let i = 0; i < 400; i++) if (rollMapContainer('crate', tier, rng).length === 0) empty++;
+      return empty / 400;
+    };
+    const low = emptyShare(1);
+    const high = emptyShare(3);
+    expect(low).toBeGreaterThan(0.2);
+    expect(low).toBeLessThan(0.45);
+    expect(high).toBeLessThan(low);
   });
 
   it('rüstet Bots aus', () => {

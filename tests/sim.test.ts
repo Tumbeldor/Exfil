@@ -335,4 +335,17 @@ describe('Progression', () => {
     const locked = OFFERS.find((o) => o.item === 'm249')!;
     expect(buyOffer(p, locked).ok).toBe(false);
   });
+
+  it('Kartenmarkierungen setzen und löschen', () => {
+    const { w, p } = quietWorld();
+    w.doAction(p.id, { a: 'ping', x: 100, y: 200, keep: true });
+    w.doAction(p.id, { a: 'unping', x: 100, y: 200 });
+    w.doAction(p.id, { a: 'unping' });
+    const evs = w.events.filter((e) => e.e === 'ping' || e.e === 'unping');
+    expect(evs).toEqual([
+      expect.objectContaining({ e: 'ping', x: 100, y: 200, by: p.id, keep: true }),
+      expect.objectContaining({ e: 'unping', by: p.id, x: 100, y: 200 }),
+      expect.objectContaining({ e: 'unping', by: p.id, x: undefined, y: undefined }),
+    ]);
+  });
 });

@@ -37,7 +37,7 @@ export function menuScreen(app: App): HTMLElement {
         h('h3', null, 'PC'),
         h('p', { class: 'small' }, 'WASD bewegen · Shift sprinten · Maus zielen, Linksklick feuern, Rechtsklick genau zielen · R nachladen · Q/Mausrad/1/2 Waffe wechseln · E interagieren · Tab Inventar · H heilen · 4 Verband · 6 Adrenalin · G Granate · Z/Mittlere Maustaste markieren · M Karte · O Extraktionen · Esc Menü'),
         h('h3', null, 'iPhone / Touch'),
-        h('p', { class: 'small' }, 'Bitte im Querformat spielen. Linker Daumen: Bewegungsstick (über den Rand ziehen = sprinten). Rechter Daumen: Zielstick – weit ausgelenkt wird gefeuert. Buttons für Nachladen, Zielfernrohr, Heilen, Granate, Waffenwechsel, Inventar, Karte und Markierung. Für Vollbild: in Safari „Teilen → Zum Home-Bildschirm“.'),
+        h('p', { class: 'small' }, 'Bitte im Querformat spielen. Linker Daumen: Bewegungsstick (über den Rand ziehen = sprinten). Rechter Daumen: Zielstick – weit ausgelenkt wird gefeuert. Buttons für Nachladen, Zielfernrohr, Heilen, Granate, Waffenwechsel, Inventar, Karte und Markierung. Auf der Karte setzt Tippen eine Markierung, eigene Markierung antippen löscht sie. Stick-Größe und -Empfindlichkeit lassen sich in den Einstellungen anpassen. Für Vollbild: in Safari „Teilen → Zum Home-Bildschirm“.'),
         h('h3', null, 'Gamepad'),
         h('p', { class: 'small' }, 'Linker Stick bewegen, rechter Stick zielen, RT feuern, LT zielen, A interagieren, X nachladen, Y Waffe wechseln, B heilen, RB Granate, Steuerkreuz ↑ Inventar.'),
         h('h3', null, 'Extraktionen'),

@@ -1418,6 +1418,35 @@ h3 {
   border: 1px solid var(--line2);
   touch-action: none;
 }
+.map-overlay .map-buttons {
+  position: absolute;
+  right: calc(12px + var(--sar));
+  top: calc(12px + var(--sat));
+}
+.map-overlay .legend-toggle {
+  pointer-events: auto;
+  align-self: flex-start;
+  appearance: none;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 800;
+  padding: 2px 0;
+  cursor: pointer;
+}
+.map-overlay .legend-toggle::after {
+  content: ' ▾';
+}
+.map-overlay .legend.collapsed .legend-toggle::after {
+  content: ' ▸';
+}
+.map-overlay .legend.collapsed .legend-body {
+  display: none;
+}
+.map-overlay .legend-hint {
+  margin-top: 4px;
+}
 .map-overlay .legend {
   position: absolute;
   left: calc(12px + var(--sal));
@@ -1431,6 +1460,8 @@ h3 {
   gap: 2px;
   max-height: 60vh;
   overflow-y: auto;
+  /* Tippen geht durch die Liste hindurch auf die Karte */
+  pointer-events: none;
 }
 .pause-menu {
   align-items: center;

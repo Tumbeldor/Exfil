@@ -63,7 +63,13 @@ export interface Ping {
   t: number;
   name: string;
   color: string;
+  by: number;
+  /** Kartenmarkierung: bleibt, bis sie gelöscht wird */
+  keep: boolean;
 }
+
+/** Höchstzahl bleibender Kartenmarkierungen je Spieler; die älteste fällt weg. */
+const MAX_MARKERS = 5;
 
 export class Effects {
   tracers: Tracer[] = [];
@@ -213,7 +219,35 @@ export class Effects {
     for (const e of this.explosions) e.t += dt;
     this.explosions = this.explosions.filter((e) => e.t < 0.5);
     const now = performance.now() / 1000;
-    this.pings = this.pings.filter((p) => now - p.t < 8);
+    this.pings = this.pings.filter((p) => p.keep || now - p.t < 8);
+  }
+
+  addPing(p: Ping) {
+    this.pings.push(p);
+    if (!p.keep) return;
+    const mine = this.pings.filter((q) => q.keep && q.by === p.by);
+    if (mine.length > MAX_MARKERS) this.pings.splice(this.pings.indexOf(mine[0]), 1);
+  }
+
+  /** Entfernt Markierungen eines Spielers an der Stelle (x, y) oder ohne Koordinaten alle. */
+  removePings(by: number, x?: number, y?: number) {
+    const all = x === undefined || y === undefined;
+    this.pings = this.pings.filter((p) => p.by !== by || (!all && Math.hypot(p.x - x, p.y - y) > 1));
+  }
+
+  /** Eigene Markierung in der Nähe von (x, y), z. B. zum Löschen. */
+  pingNear(by: number, x: number, y: number, r: number): Ping | null {
+    let best: Ping | null = null;
+    let bd = r;
+    for (const p of this.pings) {
+      if (p.by !== by) continue;
+      const d = Math.hypot(p.x - x, p.y - y);
+      if (d <= bd) {
+        bd = d;
+        best = p;
+      }
+    }
+    return best;
   }
 
   drawDecals(g: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number) {

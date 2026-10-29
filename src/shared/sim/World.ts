@@ -46,7 +46,7 @@ import {
   weaponDef,
   GRENADES,
 } from '../items';
-import { type BotType, botLoadout, rollContainer, rollLooseLoot } from '../loot';
+import { type BotType, botLoadout, rollLooseLoot, rollMapContainer } from '../loot';
 import { clamp, dist, dist2, segmentCircle } from '../math';
 import { CONTAINER_NAMES, F_BULLET, F_MOVE, F_SIGHT, type GameMap } from '../map/GameMap';
 import { buildMap } from '../map/maps';
@@ -91,6 +91,8 @@ export interface PlayerJoin {
 
 export const XP_KILL: Record<BotType | 'player', number> = { scav: 150, pmc: 400, guard: 450, boss: 2000, player: 0 };
 const BOT_HP: Record<BotType, number> = { scav: 100, pmc: 110, guard: 130, boss: 320 };
+/** Bots treffen etwas schwächer als Spieler mit derselben Waffe. */
+const BOT_DAMAGE = 0.85;
 const BOT_NAMES: Record<BotType, string> = { scav: 'Plünderer', pmc: 'Söldner', guard: 'Wache', boss: 'Boss' };
 
 const emptyStats = (): RaidStats => ({
@@ -160,14 +162,14 @@ export class World {
         x: (s.tx + 0.5) * TILE,
         y: (s.ty + 0.5) * TILE,
         tier: s.tier,
-        items: rollContainer(s.kind, s.tier, this.rng),
+        items: rollMapContainer(s.kind, s.tier, this.rng),
         searched: [],
         version: 0,
       };
       this.containers.set(c.id, c);
     }
     for (const l of this.map.lootSpots) {
-      if (this.rng.chance(0.4)) continue;
+      if (this.rng.chance(0.55)) continue;
       const it = rollLooseLoot(l.tier, this.rng);
       if (!it) continue;
       const id = this.nextContainer++;
@@ -380,7 +382,7 @@ export class World {
         speed: wd.bulletSpeed,
         range: wd.range,
         traveled: 0,
-        dmg: ammo.dmg * wd.dmgMult,
+        dmg: ammo.dmg * wd.dmgMult * (a.kind === 'bot' ? BOT_DAMAGE : 1),
         pen: ammo.pen,
         armorDmg: ammo.armorDmg,
         weapon: w.id,
@@ -420,7 +422,7 @@ export class World {
   doAction(id: number, act: PlayerAction) {
     const a = this.actors.get(id);
     if (!a || !a.alive || a.extracted) return;
-    if (a.downed && act.a !== 'ping' && act.a !== 'close') return;
+    if (a.downed && act.a !== 'ping' && act.a !== 'unping' && act.a !== 'close') return;
     switch (act.a) {
       case 'reload':
         this.startReload(a, act.ammo);
@@ -468,7 +470,10 @@ export class World {
         this.throwGrenade(a, act.x, act.y);
         break;
       case 'ping':
-        this.emit({ e: 'ping', x: act.x, y: act.y, by: a.id, name: a.name });
+        this.emit({ e: 'ping', x: act.x, y: act.y, by: a.id, name: a.name, keep: act.keep ? true : undefined });
+        break;
+      case 'unping':
+        this.emit({ e: 'unping', by: a.id, x: act.x, y: act.y });
         break;
       case 'close':
         a.viewing = null;

@@ -1,10 +1,9 @@
 import { NEAR_SENSE } from '../../shared/constants';
-import { type WeaponClass, hasItemDef, itemDef, weaponDef } from '../../shared/items';
-import type { BotType } from '../../shared/loot';
 import { clamp } from '../../shared/math';
 import type { ContainerKind, GameMap } from '../../shared/map/GameMap';
 import type { Settings } from '../settings';
 import { Effects } from './Effects';
+import { botLook, drawCorpse, drawSoldier, playerLook } from './Soldier';
 import { MapPainter, drawOverProp, roundRect } from './MapPainter';
 import type { ClientContainer, RenderActor, ViewState } from './ViewState';
 import { type VisPoly, Visibility, pointVisible } from './Visibility';
@@ -47,10 +46,6 @@ export interface FrameData {
   aimAssistTarget: number | null;
 }
 
-const BODY: Record<BotType, string> = { scav: '#6b5d44', pmc: '#2e3a44', guard: '#3b4a30', boss: '#5e2424' };
-const HEAD: Record<BotType, string> = { scav: '#4e4a42', pmc: '#1f262c', guard: '#2a3322', boss: '#8a2a2a' };
-
-const GUN_LEN: Record<WeaponClass, number> = { pistol: 10, smg: 16, ar: 22, shotgun: 21, dmr: 26, sniper: 30, lmg: 25 };
 
 export class Renderer {
   readonly ctx: CanvasRenderingContext2D;
@@ -181,16 +176,15 @@ export class Renderer {
       if (visible) a.seenAt = now;
       if (a.vis <= 0.01) continue;
       ctx.globalAlpha = a.vis;
-      this.drawActor(ctx, a.x, a.y, a.a, {
-        body: mate ? (a.c ?? '#7fb069') : BODY[a.bt ?? 'scav'],
-        head: mate ? '#d8b894' : HEAD[a.bt ?? 'scav'],
+      drawSoldier(ctx, a.x, a.y, a.a, {
+        look: mate ? playerLook(a.c ?? '#7fb069') : botLook(a.bt),
+        seed: a.i,
         weapon: a.w,
         helmet: a.h,
         armor: a.ar > 0,
         backpack: (a.f & 64) !== 0,
         downed: (a.f & 16) !== 0,
         hit: a.hitT >= 0 && a.hitT < 0.12,
-        sprint: (a.f & 1) !== 0,
       });
       ctx.globalAlpha = 1;
       if (f.aimAssistTarget === a.i && f.touch) {
@@ -203,16 +197,15 @@ export class Renderer {
     }
     // eigener Spieler
     if (me.alive) {
-      this.drawActor(ctx, me.x, me.y, me.aim, {
-        body: me.color,
-        head: '#d8b894',
+      drawSoldier(ctx, me.x, me.y, me.aim, {
+        look: playerLook(me.color),
+        seed: me.id,
         weapon: me.weapon,
         helmet: me.helmet,
         armor: me.armor,
         backpack: me.backpack,
         downed: me.downed,
         hit: false,
-        sprint: me.sprint,
       });
     }
 
@@ -276,14 +269,15 @@ export class Renderer {
     const tnow = performance.now() / 1000;
     for (const p of this.effects.pings) {
       const age = tnow - p.t;
-      const a = clamp(1 - (age - 6) / 2, 0, 1);
-      ctx.globalAlpha = a;
+      ctx.globalAlpha = p.keep ? 0.9 : clamp(1 - (age - 6) / 2, 0, 1);
       ctx.strokeStyle = p.color;
       ctx.lineWidth = 3 / z;
-      const pulse = 10 + ((age * 30) % 30);
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, pulse, 0, Math.PI * 2);
-      ctx.stroke();
+      if (!p.keep || age < 3) {
+        const pulse = 10 + ((age * 30) % 30);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, pulse, 0, Math.PI * 2);
+        ctx.stroke();
+      }
       ctx.fillStyle = p.color;
       ctx.beginPath();
       ctx.moveTo(p.x, p.y);
@@ -349,87 +343,6 @@ export class Renderer {
     vg.addColorStop(1, 'rgba(0,0,0,0.45)');
     ctx.fillStyle = vg;
     ctx.fillRect(0, 0, this.W, this.H);
-  }
-
-  private drawActor(
-    ctx: CanvasRenderingContext2D,
-    x: number,
-    y: number,
-    aim: number,
-    o: { body: string; head: string; weapon: string; helmet: string; armor: boolean; backpack: boolean; downed: boolean; hit: boolean; sprint: boolean },
-  ) {
-    const r = 11;
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    ctx.beginPath();
-    ctx.ellipse(3, 4, r + 2, r, 0, 0, Math.PI * 2);
-    ctx.fill();
-    if (o.downed) {
-      ctx.strokeStyle = `rgba(255,70,60,${0.5 + Math.sin(performance.now() / 160) * 0.3})`;
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.arc(0, 0, r + 8, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-    ctx.rotate(aim);
-    let wclass: WeaponClass = 'pistol';
-    if (o.weapon && hasItemDef(o.weapon)) wclass = weaponDef(o.weapon).wclass;
-    const len = GUN_LEN[wclass];
-    if (!o.downed) {
-      // Waffe
-      ctx.fillStyle = '#16181a';
-      const gw = wclass === 'pistol' ? 4 : 5;
-      ctx.fillRect(r - 4, -gw / 2 + 2, len + 4, gw);
-      if (wclass !== 'pistol') {
-        ctx.fillStyle = '#26292c';
-        ctx.fillRect(r + 2, 2 + gw / 2 - 1, 4, 5);
-      }
-      // Arme
-      ctx.fillStyle = o.head === '#d8b894' ? '#3a3a32' : '#2a2a26';
-      ctx.beginPath();
-      ctx.arc(r - 1, 5, 3.6, 0, Math.PI * 2);
-      ctx.arc(wclass === 'pistol' ? r + 2 : r + 9, 2.5, 3.4, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    // Rucksack
-    if (o.backpack) {
-      ctx.fillStyle = '#3d3628';
-      roundRect(ctx, -r - 4, -r * 0.62, 9, r * 1.24, 3);
-      ctx.fill();
-    }
-    // Körper
-    ctx.fillStyle = o.hit ? '#e8d0c0' : o.body;
-    ctx.beginPath();
-    if (o.downed) ctx.ellipse(0, 0, r * 1.2, r * 0.8, 0, 0, Math.PI * 2);
-    else ctx.arc(0, 0, r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(0,0,0,0.55)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    if (o.armor) {
-      ctx.fillStyle = 'rgba(30,34,30,0.55)';
-      roundRect(ctx, -7, -8, 12, 16, 3);
-      ctx.fill();
-    }
-    // Kopf / Helm
-    let headCol = o.head;
-    if (o.helmet && hasItemDef(o.helmet)) {
-      const hd = itemDef(o.helmet);
-      headCol = hd.id === 'helm_work' ? '#d8b43a' : hd.id === 'helm_altyn' ? '#4a5a3a' : '#3e4a38';
-    }
-    ctx.fillStyle = headCol;
-    ctx.beginPath();
-    ctx.arc(1, 0, 6.4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-    ctx.lineWidth = 1.2;
-    ctx.stroke();
-    if (o.helmet === 'helm_altyn') {
-      ctx.fillStyle = '#20281a';
-      ctx.fillRect(4, -4, 3, 8);
-    }
-    ctx.restore();
   }
 
   private drawHeli(ctx: CanvasRenderingContext2D, x: number, y: number) {
@@ -679,25 +592,10 @@ function drawContainer(g: CanvasRenderingContext2D, c: ClientContainer) {
       g.fillStyle = '#999';
       g.fillRect(6, -6, 2, 8);
       break;
-    case 'corpse': {
+    case 'corpse':
       g.rotate(c.rot ?? 0);
-      g.fillStyle = 'rgba(90,8,8,0.55)';
-      g.beginPath();
-      g.ellipse(-4, 2, 20, 14, 0.4, 0, Math.PI * 2);
-      g.fill();
-      const col = c.owner === 'player' ? '#5a6a4a' : BODY[(c.owner as BotType) ?? 'scav'] ?? '#555';
-      g.fillStyle = col;
-      g.beginPath();
-      g.ellipse(0, 0, 13, 9, 0, 0, Math.PI * 2);
-      g.fill();
-      g.fillStyle = 'rgba(0,0,0,0.4)';
-      g.beginPath();
-      g.arc(10, 0, 6, 0, Math.PI * 2);
-      g.fill();
-      g.fillStyle = '#222';
-      g.fillRect(-4, 9, 18, 4);
+      drawCorpse(g, c.owner, c.id);
       break;
-    }
     case 'drop':
       g.fillStyle = 'rgba(0,0,0,0.35)';
       g.beginPath();

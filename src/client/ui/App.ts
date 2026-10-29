@@ -139,8 +139,13 @@ export class App {
   /** P2P: eigene Lobby im Browser hosten. */
   async hostP2P(): Promise<NetClient> {
     this.leaveNet();
+    const gen = ++this.netGen;
     const { P2PHost } = await import('../net/p2p');
     const host = await P2PHost.create();
+    if (gen !== this.netGen) {
+      host.destroy();
+      throw new Error('abgebrochen');
+    }
     this.p2pHost = host;
     this.watchUnload();
     const net = this.attachNet(new NetClient('p2p-host-' + host.code, () => host.localSocket(), 'p2p-host'));
@@ -154,8 +159,22 @@ export class App {
     code = code.trim().toUpperCase();
     const key = 'p2p-guest-' + code;
     if (this.net && this.net.key === key && this.net.state === 'open') return this.net;
+    // läuft derselbe Beitritt schon, nicht ein zweites Mal verbinden
+    if (this.joining?.key === key) return this.joining.p;
+    const p = this.joinP2PNow(code, key);
+    this.joining = { key, p };
+    try {
+      return await p;
+    } finally {
+      if (this.joining?.p === p) this.joining = null;
+    }
+  }
+
+  private async joinP2PNow(code: string, key: string): Promise<NetClient> {
     this.leaveNet();
+    const gen = ++this.netGen;
     const { guestSocketFactory } = await import('../net/p2p');
+    if (gen !== this.netGen) throw new Error('abgebrochen');
     const net = this.attachNet(new NetClient(key, guestSocketFactory(code), 'p2p-guest'));
     try {
       await net.connect(this.profile.name);
@@ -167,6 +186,9 @@ export class App {
     return net;
   }
 
+  /** steigt bei jedem neuen Verbindungsaufbau; ältere, noch laufende Aufbauten brechen ab */
+  private netGen = 0;
+  private joining: { key: string; p: Promise<NetClient> } | null = null;
   private unloadBound = false;
   /** Host schließt den Tab: Gäste sofort benachrichtigen bzw. vorher nachfragen. */
   private watchUnload() {
@@ -183,6 +205,7 @@ export class App {
 
   /** Coop-Verbindung (und ggf. die eigene P2P-Lobby) beenden. */
   leaveNet() {
+    this.netGen++;
     this.net?.close();
     this.net = null;
     this.p2pHost?.destroy();

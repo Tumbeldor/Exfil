@@ -22,8 +22,8 @@ Rüste dich im Versteck aus, betritt eine Zone voller Bots, plündere Behälter 
 - **Plünderer-Einsatz** (wie der Scav-Run): zufällige Gratis-Ausrüstung, Plünderer-Bots bleiben neutral, solange du nicht auf sie schießt – kein Risiko, Beute geht ins Lager (Abklingzeit 10 Min.).
 - **Versicherung**: Waffen und Schutzausrüstung gegen Gebühr versichern – nach dem Tod kommen sie (entladen) ins Lager zurück.
 - **Progression**: XP & Level (bis 40), **3 Händler** mit Loyalitätsstufen (Major Brandt, Dr. Weiss, Kowalski), **20 Aufträge** (Eliminieren, Erkunden, Extrahieren, Übergeben, Bosse), **Versteck-Ausbau** (Lagerraum, sicherer Behälter, Sanitätsraum, Händlernetz), Reparaturen, Statistiken.
-- **Coop**: Lobby mit 4-stelligem Code, gemeinsamer Spawn, Wiederbeleben am Boden liegender Teamkameraden, Markierungen (Ping), Teamanzeige, Reconnect bei Verbindungsabbruch. Jeder behält seine eigene Beute.
-- **Steuerung**: Tastatur & Maus, **Touch mit zwei virtuellen Sticks** (iPhone), Gamepad.
+- **Coop**: Lobby mit 4-stelligem Code, gemeinsamer Spawn, Wiederbeleben am Boden liegender Teamkameraden, Markierungen (kurzer Ping im Spiel, bleibende Kartenmarkierungen – antippen zum Löschen), Teamanzeige, Reconnect bei Verbindungsabbruch. Jeder behält seine eigene Beute.
+- **Steuerung**: Tastatur & Maus, **Touch mit zwei virtuellen Sticks** (iPhone, Größe und Empfindlichkeit einstellbar), Gamepad.
 - **Komplett prozedural**: Grafik (Canvas) und Sound (WebAudio) werden live erzeugt – keine Asset-Dateien nötig. Als PWA installierbar.
 
 ## Schnellstart
@@ -89,7 +89,7 @@ docker run -p 3000:3000 exfil
 | Inventar | Tab / I | Tasche | Steuerkreuz ↑ |
 | Heilen | H (4 Verband, 6 Adrenalin) | ✚ | B |
 | Granate | G | Granate | RB |
-| Markieren | Z / mittlere Maustaste | Pin / Karte antippen | Steuerkreuz ↓ |
+| Markieren | Z / mittlere Maustaste (nochmal auf dieselbe Stelle = löschen) | Pin / Karte antippen, eigene Markierung antippen = löschen | Steuerkreuz ↓ |
 | Karte / Extraktionen | M / O | Karte / Timer antippen | Select / ← |
 | Menü | Esc | ❚❚ | Start |
 
