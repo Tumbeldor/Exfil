@@ -1,11 +1,43 @@
-import { randomBytes } from 'node:crypto';
-import type { WebSocket } from 'ws';
-import { PROTOCOL_VERSION } from '../shared/constants';
-import { EQUIP_SLOTS, type Inventory, emptyInventory } from '../shared/inventory';
-import { type ItemStack, hasItemDef, itemDef, makeUid } from '../shared/items';
-import { MAP_METAS } from '../shared/map/maps';
-import type { ClientMsg, JoinPayload, LobbyState, ServerMsg } from '../shared/net/protocol';
-import { RaidHost } from '../shared/net/RaidHost';
+import { PROTOCOL_VERSION } from '../constants';
+import { EQUIP_SLOTS, type Inventory, emptyInventory } from '../inventory';
+import { type ItemStack, hasItemDef, itemDef, makeUid } from '../items';
+import { MAP_METAS } from '../map/maps';
+import type { ClientMsg, JoinPayload, LobbyState, ServerMsg } from './protocol';
+import { RaidHost } from './RaidHost';
+
+/** Eine Verbindung zu einem Client – WebSocket (Server), WebRTC-Datenkanal (P2P) oder Loopback. */
+export interface Conn {
+  send(data: string): void;
+  close(): void;
+  isOpen(): boolean;
+}
+
+/** Zeitgeber für die Raid-Schleife; gibt eine Stopp-Funktion zurück. */
+export type Ticker = (fn: () => void, ms: number) => () => void;
+
+export interface LobbyServerOpts {
+  ticker?: Ticker;
+  log?: (s: string) => void;
+  /** P2P-Modus: höchstens eine Lobby (die des Hosts) */
+  singleLobby?: boolean;
+}
+
+const defaultTicker: Ticker = (fn, ms) => {
+  const t = setInterval(fn, ms);
+  return () => clearInterval(t);
+};
+
+function randomHex(bytes: number): string {
+  const a = new Uint8Array(bytes);
+  globalThis.crypto.getRandomValues(a);
+  return [...a].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+const CODE_LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+export function randomLobbyCode(): string {
+  return Array.from({ length: 4 }, () => CODE_LETTERS[Math.floor(Math.random() * CODE_LETTERS.length)]).join('');
+}
+export const isLobbyCode = (c: string) => /^[A-Z0-9]{4}$/.test(c);
 
 const MAX_PLAYERS = 4;
 const RESUME_GRACE_MS = 3 * 60 * 1000;
@@ -13,7 +45,7 @@ const RESUME_GRACE_MS = 3 * 60 * 1000;
 interface Client {
   id: string;
   token: string;
-  ws: WebSocket | null;
+  ws: Conn | null;
   name: string;
   lobby: Lobby | null;
   kit: JoinPayload | null;
@@ -29,7 +61,7 @@ interface Lobby {
   friendlyFire: boolean;
   members: Client[];
   raid: RaidHost | null;
-  timer: NodeJS.Timeout | null;
+  stopTimer: (() => void) | null;
 }
 
 function sanitizeItem(it: ItemStack | undefined): ItemStack | undefined {
@@ -58,40 +90,65 @@ export function sanitizeInventory(raw: Inventory | undefined): Inventory {
   return inv;
 }
 
+/** Lobbys und Coop-Raids – läuft auf dem Node-Server oder im Browser des P2P-Hosts. */
 export class LobbyServer {
   private clients = new Map<string, Client>();
   private byToken = new Map<string, Client>();
   private lobbies = new Map<string, Lobby>();
-  private sockets = new WeakMap<WebSocket, Client>();
+  private sockets = new Map<Conn, Client>();
+  private ticker: Ticker;
+  private log: (s: string) => void;
+  private stopSweep: () => void;
 
-  constructor() {
-    setInterval(() => this.sweep(), 15000).unref();
+  constructor(private opts: LobbyServerOpts = {}) {
+    this.ticker = opts.ticker ?? defaultTicker;
+    this.log = opts.log ?? (() => {});
+    const t = setInterval(() => this.sweep(), 15000) as unknown as { unref?: () => void };
+    t.unref?.();
+    this.stopSweep = () => clearInterval(t as unknown as number);
   }
 
   private send(c: Client, m: ServerMsg) {
-    if (c.ws && c.ws.readyState === 1) c.ws.send(JSON.stringify(m));
+    if (c.ws && c.ws.isOpen()) c.ws.send(JSON.stringify(m));
   }
 
-  attach(ws: WebSocket) {
-    ws.on('message', (data) => {
-      let msg: ClientMsg;
+  /** Neue Verbindung anmelden. Eingehende Daten und das Schließen meldet der Aufrufer zurück. */
+  attach(conn: Conn): { message(data: string): void; close(): void } {
+    return {
+      message: (data: string) => {
+        let msg: ClientMsg;
+        try {
+          msg = JSON.parse(data);
+        } catch {
+          return;
+        }
+        if (!msg || typeof msg !== 'object') return;
+        try {
+          this.onMessage(conn, msg);
+        } catch (e) {
+          console.error('Fehler bei Nachricht', msg.type, e);
+        }
+      },
+      close: () => this.onClose(conn),
+    };
+  }
+
+  /** Alles beenden (P2P-Host verlässt das Spiel). */
+  shutdown() {
+    this.stopSweep();
+    for (const l of this.lobbies.values()) this.stopRaid(l);
+    for (const c of this.sockets.keys()) {
       try {
-        msg = JSON.parse(String(data));
+        c.close();
       } catch {
-        return;
+        /* */
       }
-      if (!msg || typeof msg !== 'object') return;
-      try {
-        this.onMessage(ws, msg);
-      } catch (e) {
-        console.error('Fehler bei Nachricht', msg.type, e);
-      }
-    });
-    ws.on('close', () => this.onClose(ws));
-    ws.on('error', () => {});
+    }
+    this.lobbies.clear();
+    this.sockets.clear();
   }
 
-  private onMessage(ws: WebSocket, msg: ClientMsg) {
+  private onMessage(ws: Conn, msg: ClientMsg) {
     if (msg.type === 'hello') return this.hello(ws, msg);
     const c = this.sockets.get(ws);
     if (!c) return;
@@ -99,11 +156,14 @@ export class LobbyServer {
       case 'ping':
         this.send(c, { type: 'pong', t: msg.t });
         break;
-      case 'create':
+      case 'create': {
         c.name = cleanName(msg.name) || c.name;
+        if (this.opts.singleLobby && this.lobbies.size > 0 && c.lobby === null) return this.send(c, { type: 'error', text: 'Dieser Host hat bereits eine Lobby.' });
         this.leaveLobby(c);
-        this.createLobby(c);
+        const wanted = typeof msg.code === 'string' ? msg.code.toUpperCase() : '';
+        this.createLobby(c, isLobbyCode(wanted) && !this.lobbies.has(wanted) ? wanted : undefined);
         break;
+      }
       case 'join': {
         c.name = cleanName(msg.name) || c.name;
         const l = this.lobbies.get(String(msg.code ?? '').toUpperCase());
@@ -168,7 +228,7 @@ export class LobbyServer {
     }
   }
 
-  private hello(ws: WebSocket, msg: Extract<ClientMsg, { type: 'hello' }>) {
+  private hello(ws: Conn, msg: Extract<ClientMsg, { type: 'hello' }>) {
     if (msg.v !== PROTOCOL_VERSION) {
       ws.send(JSON.stringify({ type: 'error', text: 'Version passt nicht – bitte Seite neu laden.' } satisfies ServerMsg));
     }
@@ -187,8 +247,8 @@ export class LobbyServer {
       c.goneAt = 0;
       resumed = true;
     } else {
-      const id = randomBytes(6).toString('hex');
-      const token = randomBytes(18).toString('hex');
+      const id = randomHex(6);
+      const token = randomHex(18);
       c = { id, token, ws, name: cleanName(msg.name) || 'Operator', lobby: null, kit: null, ready: false, goneAt: 0 };
       this.clients.set(id, c);
       this.byToken.set(token, c);
@@ -202,7 +262,7 @@ export class LobbyServer {
     } else this.send(c, { type: 'lobby', lobby: null });
   }
 
-  private onClose(ws: WebSocket) {
+  private onClose(ws: Conn) {
     const c = this.sockets.get(ws);
     if (!c) return;
     this.sockets.delete(ws);
@@ -225,13 +285,10 @@ export class LobbyServer {
     }
   }
 
-  private createLobby(c: Client) {
-    let code = '';
-    const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    do {
-      code = Array.from({ length: 4 }, () => letters[Math.floor(Math.random() * letters.length)]).join('');
-    } while (this.lobbies.has(code));
-    const l: Lobby = { code, hostId: c.id, mapId: 'grenzstadt', difficulty: 1, friendlyFire: false, members: [c], raid: null, timer: null };
+  private createLobby(c: Client, wanted?: string) {
+    let code = wanted ?? '';
+    while (!code || this.lobbies.has(code)) code = randomLobbyCode();
+    const l: Lobby = { code, hostId: c.id, mapId: 'grenzstadt', difficulty: 1, friendlyFire: false, members: [c], raid: null, stopTimer: null };
     this.lobbies.set(code, l);
     c.lobby = l;
     c.ready = false;
@@ -299,7 +356,7 @@ export class LobbyServer {
     l.raid = raid;
     raid.startAll();
     let last = performance.now();
-    l.timer = setInterval(() => {
+    l.stopTimer = this.ticker(() => {
       const now = performance.now();
       raid.update((now - last) / 1000);
       last = now;
@@ -307,14 +364,14 @@ export class LobbyServer {
     raid.onEnd = () => {
       setTimeout(() => this.stopRaid(l), 500);
     };
-    console.log(`[${l.code}] Raid gestartet auf ${l.mapId} mit ${players.length} Spieler(n)`);
+    this.log(`[${l.code}] Raid gestartet auf ${l.mapId} mit ${players.length} Spieler(n)`);
     this.broadcast(l);
   }
 
   private stopRaid(l: Lobby) {
-    if (l.timer) clearInterval(l.timer);
-    l.timer = null;
-    if (l.raid) console.log(`[${l.code}] Raid beendet`);
+    l.stopTimer?.();
+    l.stopTimer = null;
+    if (l.raid) this.log(`[${l.code}] Raid beendet`);
     l.raid = null;
     if (this.lobbies.has(l.code)) this.broadcast(l);
   }

@@ -71,7 +71,7 @@ export interface JoinPayload {
 
 export type ClientMsg =
   | { type: 'hello'; v: number; token?: string; name: string }
-  | { type: 'create'; name: string }
+  | { type: 'create'; name: string; code?: string }
   | { type: 'join'; code: string; name: string }
   | { type: 'leave' }
   | { type: 'ready'; ready: boolean; kit?: JoinPayload }

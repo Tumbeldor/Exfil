@@ -77,7 +77,11 @@ export class NetLink implements RaidLink {
       const me = l?.players.find((p) => p.id === net.id);
       if (!l || !l.raidActive || (me && !me.inRaid)) setTimeout(() => !this.gotResult && this.onLost?.(), 1500);
     });
+    this.offState = net.onState((st) => {
+      if (st === 'failed' && !this.gotResult) this.onLost?.();
+    });
   }
+  private offState: () => void;
 
   /** Nachrichten, die vor dem Erstellen der Sitzung eintrafen. */
   prime(msgs: HostMsg[]) {
@@ -98,6 +102,7 @@ export class NetLink implements RaidLink {
   close() {
     this.off();
     this.offLobby();
+    this.offState();
     this.onMessage = null;
     this.onLost = null;
   }

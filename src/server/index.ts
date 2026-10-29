@@ -3,7 +3,7 @@ import { createServer } from 'node:http';
 import { extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
-import { LobbyServer } from './lobby';
+import { LobbyServer } from '../shared/net/LobbyServer';
 
 const PORT = Number(process.env.PORT ?? 3000);
 const here = fileURLToPath(new URL('.', import.meta.url));
@@ -22,10 +22,15 @@ const MIME: Record<string, string> = {
   '.woff2': 'font/woff2',
 };
 
-const lobbies = new LobbyServer();
+const lobbies = new LobbyServer({ log: (s) => console.log(s) });
 
 const server = createServer((req, res) => {
   const url = new URL(req.url ?? '/', 'http://localhost');
+  if (url.pathname.endsWith('/server-info.json')) {
+    res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+    res.end(JSON.stringify({ server: true }));
+    return;
+  }
   if (url.pathname === '/health') {
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ ok: true, ...lobbies.stats() }));
@@ -52,7 +57,12 @@ const server = createServer((req, res) => {
 });
 
 const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 256 * 1024 });
-wss.on('connection', (ws) => lobbies.attach(ws));
+wss.on('connection', (ws) => {
+  const h = lobbies.attach({ send: (d) => ws.send(d), close: () => ws.close(), isOpen: () => ws.readyState === ws.OPEN });
+  ws.on('message', (data) => h.message(String(data)));
+  ws.on('close', () => h.close());
+  ws.on('error', () => {});
+});
 
 server.listen(PORT, () => {
   console.log(`Extraction Looter Server läuft auf http://localhost:${PORT}`);

@@ -7,6 +7,8 @@ import { MapPainter } from '../game/MapPainter';
 import { RaidSession } from '../game/RaidSession';
 import { LocalLink, NetLink } from '../net/links';
 import { NetClient } from '../net/NetClient';
+import type { P2PHost } from '../net/p2p';
+import { wsSocket } from '../net/sockets';
 import { type Settings, isTouchDevice, saveSettings } from '../settings';
 import { saveProfile } from '../storage';
 import { clear, h, modal, toast } from './dom';
@@ -21,7 +23,12 @@ export class App {
   readonly ui: HTMLElement;
   private current: HTMLElement | null = null;
   net: NetClient | null = null;
+  p2pHost: P2PHost | null = null;
   session: RaidSession | null = null;
+  /** Aus einem Einladungslink (#join=CODE) */
+  pendingJoin: { code: string; mode: 'p2p' | 'server' } | null = null;
+  coopMode: 'p2p' | 'server' | null = null;
+  private serverAvailable: boolean | null = null;
   private overviewCache = new Map<string, HTMLCanvasElement>();
 
   constructor(
@@ -112,17 +119,96 @@ export class App {
     return c;
   }
 
-  ensureNet(url: string): NetClient {
-    if (this.net && this.net.url === url) return this.net;
-    this.net?.close();
-    const net = new NetClient(url);
-    // Coop-Raid starten, sobald der Server ihn ankündigt
+  private attachNet(net: NetClient) {
+    // Coop-Raid starten, sobald der Host ihn ankündigt
     net.onRaid((m) => {
-      if (this.session || m.type !== 'raidStart') return;
+      if (this.session || m.type !== 'raidStart' || this.net !== net) return;
       this.startCoop(net, [m]);
     });
     this.net = net;
     return net;
+  }
+
+  /** Verbindung zu einem Node-Coop-Server. */
+  ensureServerNet(url: string): NetClient {
+    if (this.net && this.net.key === url) return this.net;
+    this.leaveNet();
+    return this.attachNet(new NetClient(url, () => wsSocket(url), 'server'));
+  }
+
+  /** P2P: eigene Lobby im Browser hosten. */
+  async hostP2P(): Promise<NetClient> {
+    this.leaveNet();
+    const { P2PHost } = await import('../net/p2p');
+    const host = await P2PHost.create();
+    this.p2pHost = host;
+    this.watchUnload();
+    const net = this.attachNet(new NetClient('p2p-host-' + host.code, () => host.localSocket(), 'p2p-host'));
+    await net.connect(this.profile.name);
+    net.send({ type: 'create', name: this.profile.name, code: host.code });
+    return net;
+  }
+
+  /** P2P: einer Lobby per Code beitreten. */
+  async joinP2P(code: string): Promise<NetClient> {
+    code = code.trim().toUpperCase();
+    const key = 'p2p-guest-' + code;
+    if (this.net && this.net.key === key && this.net.state === 'open') return this.net;
+    this.leaveNet();
+    const { guestSocketFactory } = await import('../net/p2p');
+    const net = this.attachNet(new NetClient(key, guestSocketFactory(code), 'p2p-guest'));
+    try {
+      await net.connect(this.profile.name);
+    } catch (e) {
+      if (this.net === net) this.net = null;
+      throw e;
+    }
+    net.send({ type: 'join', code, name: this.profile.name });
+    return net;
+  }
+
+  private unloadBound = false;
+  /** Host schließt den Tab: Gäste sofort benachrichtigen bzw. vorher nachfragen. */
+  private watchUnload() {
+    if (this.unloadBound) return;
+    this.unloadBound = true;
+    window.addEventListener('beforeunload', (e) => {
+      if (this.p2pHost && this.p2pHost.guests > 0) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    });
+    window.addEventListener('pagehide', () => this.p2pHost?.destroy());
+  }
+
+  /** Coop-Verbindung (und ggf. die eigene P2P-Lobby) beenden. */
+  leaveNet() {
+    this.net?.close();
+    this.net = null;
+    this.p2pHost?.destroy();
+    this.p2pHost = null;
+  }
+
+  /** Einladungslink für eine Lobby. */
+  inviteUrl(code: string, mode: 'p2p' | 'server') {
+    return `${location.origin}${location.pathname}${location.search}#join=${code}${mode === 'server' ? '&mode=server' : ''}`;
+  }
+
+  /** Läuft ein Node-Coop-Server unter derselben Adresse? (auf GitHub Pages: nein) */
+  async detectServer(): Promise<boolean> {
+    if (this.serverAvailable !== null) return this.serverAvailable;
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 2500);
+      // statisch (GitHub Pages): {"server": false} – der Node-Server antwortet mit {"server": true}
+      const res = await fetch('./server-info.json', { cache: 'no-store', signal: ctrl.signal });
+      clearTimeout(t);
+      const j = res.ok ? await res.json() : null;
+      this.serverAvailable = j?.server === true;
+    } catch {
+      this.serverAvailable = false;
+    }
+    return this.serverAvailable;
   }
 
   // ---- Raids ----

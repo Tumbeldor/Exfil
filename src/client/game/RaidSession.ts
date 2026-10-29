@@ -90,6 +90,7 @@ export class RaidSession {
   private aimAssistTarget: number | null = null;
   private lastAimDist = 300;
   private paused = false;
+  private stallWarned = false;
   private onResize = () => this.renderer?.resize();
   private onVis = () => {
     if (document.hidden && !this.opts.link.coop && this.ready && !this.finished) this.openPause();
@@ -261,6 +262,14 @@ export class RaidSession {
       this.shots = [];
     }
 
+    // Coop: keine Daten mehr vom Host?
+    if (link.coop && this.ready && !this.finished) {
+      const silent = now - v.lastSnapAt;
+      if (silent > 6 && !this.stallWarned) {
+        this.stallWarned = true;
+        this.hud.message('Verbindung zum Host unterbrochen – versuche erneut …', 'warn', 6000);
+      } else if (silent < 1) this.stallWarned = false;
+    }
     v.interpolate(now, dt);
     const evs = v.takeEvents(now, (e) => e.to === v.you || e.e === 'msg' || e.e === 'xp' || e.e === 'searched' || e.e === 'tile' || e.e === 'container' || e.e === 'cremove' || e.e === 'ping');
     for (const e of evs) this.applyEvent(e, now);

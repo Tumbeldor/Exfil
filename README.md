@@ -2,6 +2,10 @@
 
 Ein **Top-Down Extraction Shooter** im Stil von *Escape from Tarkov* und *DMZ* – spielbar im Browser auf **PC und iPhone**, **solo** oder im **Coop** (bis zu 4 Spieler).
 
+### ▶ Jetzt spielen: **https://tumbeldor.github.io/ExtractionLooter/**
+
+Einfach den Link teilen – Solo und Coop laufen direkt im Browser, ohne Installation und ohne eigenen Server. Für Coop erstellt einer unter **Coop → Lobby erstellen** eine Lobby und schickt den **Einladungslink**; wer ihn öffnet, landet direkt in der Lobby.
+
 Rüste dich im Versteck aus, betritt eine Zone voller Bots, plündere Behälter und Leichen und erreiche eine Extraktion, bevor die Zeit abläuft. Wer stirbt, verliert alles, was er dabeihatte – bis auf den sicheren Behälter.
 
 ## Features
@@ -43,11 +47,25 @@ Dann im Browser **http://localhost:3000** öffnen.
 
 ### Coop mit Freunden
 
-Alle Spieler öffnen dieselbe Server-Adresse. Einer erstellt unter **Coop** eine Lobby und teilt den Code, die anderen treten bei. Alle klicken **Bereit**, der Host startet den Raid.
+Es gibt zwei Wege:
 
-- Im selben Netzwerk: einfach die LAN-Adresse des PCs verwenden.
-- Über das Internet: den Server auf einem Host mit Node.js betreiben (z. B. per Docker, siehe unten) oder einen Tunnel nutzen. Der Server liefert Spiel und Coop über **einen Port** (HTTP + WebSocket unter `/ws`).
-- In den Einstellungen kann eine andere Server-Adresse eingetragen werden.
+**1. Online (direkt, ohne Server)** – Standard auf GitHub Pages
+- Einer erstellt unter **Coop → Lobby erstellen** eine Lobby und tippt auf **Einladungslink teilen** (auf dem iPhone öffnet sich das Teilen-Menü, z. B. für WhatsApp).
+- Freunde öffnen den Link (oder geben den 4-stelligen Code ein), alle klicken **Bereit**, der Host startet den Raid.
+- Die Verbindung läuft per WebRTC direkt zwischen den Browsern ([PeerJS](https://peerjs.com) übernimmt nur das Zusammenbringen und stellt bei Bedarf Relay-Server bereit). Der **Host betreibt den Raid in seinem Browser**: Er muss die Seite geöffnet und – besonders auf dem iPhone – im Vordergrund lassen. Schließt der Host, endet die Lobby für alle.
+
+**2. Eigener Server** – stabiler, unabhängig von einem Host-Gerät
+- `npm start` auf einem PC oder einem Server (z. B. per Docker, siehe unten). Der Server liefert Spiel und Coop über **einen Port** (HTTP + WebSocket unter `/ws`).
+- Alle öffnen dessen Adresse; der Coop-Bildschirm erkennt den Server automatisch. Im selben WLAN genügt die LAN-Adresse des PCs.
+- In den Einstellungen kann auch eine andere Server-Adresse eingetragen werden.
+
+### GitHub Pages einrichten (einmalig)
+
+Das Spiel wird bei jedem Push automatisch gebaut und veröffentlicht (`.github/workflows/pages.yml`). Damit das klappt, muss GitHub Pages einmal aktiviert werden:
+
+**Repository → Settings → Pages → Build and deployment → Source: „GitHub Actions“**
+
+Danach unter **Actions → GitHub Pages → Run workflow** einmal starten (oder einfach etwas pushen). Die Adresse lautet `https://<benutzername>.github.io/ExtractionLooter/`.
 
 ### Docker
 

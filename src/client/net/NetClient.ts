@@ -1,5 +1,6 @@
 import { PROTOCOL_VERSION } from '../../shared/constants';
 import type { ClientMsg, HostMsg, LobbyState, ServerMsg } from '../../shared/net/protocol';
+import { type Socket, type SocketFactory } from './sockets';
 
 type Listener<T> = (m: T) => void;
 
@@ -16,10 +17,14 @@ export function defaultServerUrl(custom: string): string {
   return (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws';
 }
 
-/** WebSocket-Client für Lobby und Coop-Raids mit automatischem Wiederverbinden. */
+/** Wiederverbindungsversuche: Server großzügig, P2P-Gäste merken einen weggefallenen Host schneller. */
+const MAX_RETRIES = { server: 7, 'p2p-host': 2, 'p2p-guest': 3 } as const;
+
+/** Client für Lobby und Coop-Raids (WebSocket oder WebRTC) mit automatischem Wiederverbinden. */
 export class NetClient {
-  private ws: WebSocket | null = null;
-  state: 'idle' | 'connecting' | 'open' | 'closed' = 'idle';
+  private ws: Socket | null = null;
+  /** failed = Wiederverbinden endgültig aufgegeben */
+  state: 'idle' | 'connecting' | 'open' | 'closed' | 'failed' = 'idle';
   id = '';
   lobby: LobbyState | null = null;
   rtt = 0;
@@ -32,8 +37,14 @@ export class NetClient {
   private retry = 0;
   private pingTimer: number | null = null;
   private name = 'Operator';
+  private everOpened = false;
 
-  constructor(public url: string) {}
+  constructor(
+    /** Eindeutiger Schlüssel der Verbindung (z. B. Server-URL oder P2P-Code) */
+    public readonly key: string,
+    private factory: SocketFactory,
+    public readonly kind: 'server' | 'p2p-host' | 'p2p-guest' = 'server',
+  ) {}
 
   connect(name: string): Promise<void> {
     this.name = name;
@@ -56,9 +67,9 @@ export class NetClient {
 
   private open(onOpen?: () => void, onFail?: (e: Error) => void) {
     this.setState('connecting');
-    let ws: WebSocket;
+    let ws: Socket;
     try {
-      ws = new WebSocket(this.url);
+      ws = this.factory();
     } catch (e) {
       this.setState('closed');
       onFail?.(e as Error);
@@ -68,6 +79,7 @@ export class NetClient {
     let opened = false;
     ws.onopen = () => {
       opened = true;
+      this.everOpened = true;
       this.retry = 0;
       this.setState('open');
       let token: string | undefined;
@@ -80,10 +92,10 @@ export class NetClient {
       this.pingTimer = window.setInterval(() => this.send({ type: 'ping', t: performance.now() }), 2000);
       onOpen?.();
     };
-    ws.onmessage = (ev) => {
+    ws.onmessage = (data) => {
       let m: ServerMsg;
       try {
-        m = JSON.parse(ev.data as string);
+        m = JSON.parse(data);
       } catch {
         return;
       }
@@ -92,19 +104,30 @@ export class NetClient {
     ws.onclose = () => {
       if (this.pingTimer) clearInterval(this.pingTimer);
       this.pingTimer = null;
+      if (this.ws !== ws) return;
       this.ws = null;
-      this.setState('closed');
-      if (!opened) onFail?.(new Error('Server nicht erreichbar'));
-      if (this.wantOpen && opened) {
-        // Wiederverbinden mit Backoff
-        const delay = Math.min(8000, 500 * Math.pow(2, this.retry++));
-        setTimeout(() => {
-          if (this.wantOpen) this.open();
-        }, delay);
+      if (!opened && !this.everOpened) {
+        this.setState('closed');
+        onFail?.(new Error('Verbindung fehlgeschlagen'));
+        return;
       }
-    };
-    ws.onerror = () => {
-      /* onclose folgt */
+      if (!this.wantOpen) {
+        this.setState('closed');
+        return;
+      }
+      if (this.retry >= MAX_RETRIES[this.kind]) {
+        this.wantOpen = false;
+        this.lobby = null;
+        this.setState('failed');
+        for (const l of this.lobbyL) l(null);
+        return;
+      }
+      // Wiederverbinden mit Backoff
+      this.setState('connecting');
+      const delay = Math.min(6000, 500 * Math.pow(2, this.retry++));
+      setTimeout(() => {
+        if (this.wantOpen) this.open();
+      }, delay);
     };
   }
 
@@ -142,7 +165,7 @@ export class NetClient {
   }
 
   send(m: ClientMsg) {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(m));
+    if (this.ws && this.ws.isOpen) this.ws.send(JSON.stringify(m));
   }
 
   onLobby(fn: Listener<LobbyState | null>) {
@@ -171,8 +194,11 @@ export class NetClient {
   close() {
     this.wantOpen = false;
     this.send({ type: 'leave' });
-    this.ws?.close();
+    const ws = this.ws;
     this.ws = null;
+    // "leave" noch zustellen lassen
+    setTimeout(() => ws?.close(), 50);
     this.lobby = null;
+    this.setState('closed');
   }
 }
